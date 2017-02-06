@@ -28,10 +28,16 @@ void ensureJobDescription() {
 }
 
 @NonCPS
-String getSourceBranchLabel() {
+private String getSourceBranchLabel() {
   println "checking github api for pull request details"
+
+  tokens = "${env.CHANGE_URL}".tokenize('/')
+  org = tokens[2]
+  repo = tokens[3]
+  pr = tokens[5]
+
   // FIXME use github credentials to avoid rate limiting
-  def prUrl = new URL("https://api.github.com/repos/zanata/zanata-platform/pulls/${env.CHANGE_ID}")
+  def prUrl = new URL("https://api.github.com/repos/${org}/${repo}/pulls/${pr}")
   def sourceBranchLabel = new groovy.json.JsonSlurper().parseText(prUrl.text).head.label
   return sourceBranchLabel
 }
