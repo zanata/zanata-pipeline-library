@@ -19,6 +19,9 @@ void ensureJobDescription() {
         job.save()
         null // avoid returning non-Serializable Job
       }
+    } catch (org.jenkinsci.plugins.scriptsecurity.sandbox.RejectedAccessException e) {
+      // allow for Jenkins In-process Script Approval
+      throw e
     } catch (e) {
       // NB we don't want to fail the build just because of a problem in this method
       println e
