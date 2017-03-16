@@ -36,5 +36,10 @@ private void sendHipChat(Map p) {
   } catch (NoSuchMethodError e) {
     println("hipchatSend skipped: no such method")
     return
+  } catch (Exception e) {
+    // TODO how to print stack trace to the build log?
+    e.printStackTrace()
+    println("hipchatSend failed" + e)
+    return
   }
 }
