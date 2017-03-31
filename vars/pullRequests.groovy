@@ -22,7 +22,7 @@ void ensureJobDescription() {
     } catch (e) {
       // org.jenkinsci.plugins.scriptsecurity.sandbox.RejectedAccessException is not in Maven Central,
       // so we can't use it in Jenkins Pipeline Unit tests:
-      if (e.toString() contains 'RejectedAccessException') {
+      if (e.toString().contains('RejectedAccessException')) {
         // allow for Jenkins In-process Script Approval
         throw e
       }
