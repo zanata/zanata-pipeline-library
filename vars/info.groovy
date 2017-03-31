@@ -1,7 +1,9 @@
-void printNode() {
-  println "running on node ${env.NODE_NAME}"
-}
+class info implements Serializable {
+  void printNode(env) {
+    println "running on node ${env.NODE_NAME}"
+  }
 
-void printEnv() {
-  sh "env|sort"
+  void printEnv() {
+    sh "env|sort"
+  }
 }
