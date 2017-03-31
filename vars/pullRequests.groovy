@@ -19,10 +19,13 @@ void ensureJobDescription() {
         job.save()
         null // avoid returning non-Serializable Job
       }
-    } catch (org.jenkinsci.plugins.scriptsecurity.sandbox.RejectedAccessException e) {
-      // allow for Jenkins In-process Script Approval
-      throw e
     } catch (e) {
+      // org.jenkinsci.plugins.scriptsecurity.sandbox.RejectedAccessException is not in Maven Central,
+      // so we can't use it in Jenkins Pipeline Unit tests:
+      if (e.toString() contains 'RejectedAccessException') {
+        // allow for Jenkins In-process Script Approval
+        throw e
+      }
       // NB we don't want to fail the build just because of a problem in this method
       println e
       e.printStackTrace() // not sure how to log this to the build log
