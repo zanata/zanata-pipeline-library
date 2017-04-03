@@ -44,9 +44,13 @@ class notify implements Serializable {
       println("hipchatSend skipped: no such method")
       return
     } catch (Exception e) {
-      // TODO how to print stack trace to the build log?
-      e.printStackTrace()
-      println("hipchatSend failed" + e)
+      // org.jenkinsci.plugins.scriptsecurity.sandbox.RejectedAccessException is not in Maven Central,
+      // so we can't use it in Jenkins Pipeline Unit tests:
+      if (e.toString().contains('RejectedAccessException')) {
+        // allow for Jenkins In-process Script Approval
+        throw e
+      }
+      println("hipchatSend failed: " + e)
       return
     }
   }
