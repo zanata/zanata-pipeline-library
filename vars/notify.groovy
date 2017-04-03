@@ -1,6 +1,9 @@
 class notify implements Serializable {
-  def env
-//  def steps
+  private def env
+
+  void init(def env) {
+    this.env = env
+  }
 
   void started() {
     sendHipChat color: "GRAY", notify: true, message: "STARTED: Job " + jobLink()
