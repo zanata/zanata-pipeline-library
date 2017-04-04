@@ -6,14 +6,13 @@ import groovy.json.JsonSlurper
 class PullRequests implements Serializable {
 
   @NonCPS
-  static void ensureJobDescription(def env, manager,
-                                   Closure echo) {
+  static void ensureJobDescription(env, manager, steps) {
     if (env.CHANGE_ID) {
       try {
         def job = manager.build.project
         // we only want to do this once, to avoid hammering the github api
         if (!job.description || !job.description.contains(env.CHANGE_URL)) {
-          def sourceBranchLabel = getSourceBranchLabel(env.CHANGE_URL, echo)
+          def sourceBranchLabel = getSourceBranchLabel(env.CHANGE_URL, steps)
           def abbrTitle = Strings.truncateAtWord(env.CHANGE_TITLE, 50)
           def prDesc = """<a title=\"${env.CHANGE_TITLE}\" href=\"${
             env.CHANGE_URL
@@ -24,7 +23,7 @@ class PullRequests implements Serializable {
           // ideally we would show eg sourceRepo/featureBranch ⭆ master
           // but there is no env var with that info
 
-          echo "description: " + prDesc
+          steps.echo "description: " + prDesc
           //currentBuild.description = prDesc
           job.description = prDesc
           job.save()
@@ -38,14 +37,14 @@ class PullRequests implements Serializable {
           throw e
         }
         // NB we don't want to fail the build just because of a problem in this method
-        echo StackTraces.getStackTrace(e)
+        steps.echo StackTraces.getStackTrace(e)
       }
     }
   }
 
   @NonCPS
-  private static String getSourceBranchLabel(String changeURL, Closure echo) {
-    echo "checking github api for pull request details"
+  private static String getSourceBranchLabel(String changeURL, def steps) {
+    steps.echo "checking github api for pull request details"
 
     def tokens = changeURL.tokenize('/')
     def org = tokens[2]

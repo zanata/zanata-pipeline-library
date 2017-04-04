@@ -2,13 +2,11 @@ package org.zanata.jenkins
 
 class Notifier implements Serializable {
   private def env
-  private Closure hipchatSend
-  private Closure echo
+  private def steps
 
-  Notifier(def env, Closure hipchatSend, Closure echo) {
-    this.hipchatSend = hipchatSend
+  Notifier(env, steps) {
     this.env = env
-    this.echo = echo
+    this.steps = steps
   }
 
   void started() {
@@ -38,7 +36,7 @@ class Notifier implements Serializable {
 
   private void sendHipChat(Map p) {
     try {
-      hipchatSend(
+      steps.hipchatSend(
               color: p.color,
               failOnError: p.failOnError ?: false,
               message: p.message,
@@ -47,7 +45,7 @@ class Notifier implements Serializable {
               textFormat: p.textFormat ?: false,
               v2enabled: p.v2enabled ?: false)
     } catch (NoSuchMethodError ignored) {
-      echo("hipchatSend skipped: no such method")
+      steps.echo("hipchatSend skipped: no such method")
     } catch (Exception e) {
       // org.jenkinsci.plugins.scriptsecurity.sandbox.RejectedAccessException is not in Maven Central,
       // so we can't use it in Jenkins Pipeline Unit tests:
@@ -55,7 +53,7 @@ class Notifier implements Serializable {
         // allow for Jenkins In-process Script Approval
         throw e
       }
-      echo("hipchatSend failed: " + e)
+      steps.echo("hipchatSend failed: " + e)
     }
   }
 }
