@@ -41,11 +41,11 @@ class Notifier implements Serializable {
         if (result == 'SUCCESS'){
           build.result = null
         }
-        testResult(context, result);
+        testResults(context, result);
         break;
       case CONTEXT_WILDFLY8:
       case CONTEXT_JBOSSEAP:
-        testResult(context, result);
+        testResults(context, result);
         break;
       case CONTEXT_FINISH:
         if (build.result == null ){
