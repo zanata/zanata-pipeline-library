@@ -60,13 +60,13 @@ class Notifier implements Serializable {
       default:
         break;
     }
-    setGitHubCommitStatus(context, message)
+    setGitHubCommitStatus(build, context, message)
   }
 
   // Revised from https://issues.jenkins-ci.org/browse/JENKINS-38674
   void setGitHubCommitStatus(def build, String context, String message = '' ) {
     def msg = message + ' ' + context + ': '\
-      + ((build.duration)? ' Duration: ' + build.durationString : '')\
+      + ((build.durationString)? ' Duration: ' + build.durationString : '')\
       + ((build.description)? ' Desc: ' + build.description: '')
 
     step([
