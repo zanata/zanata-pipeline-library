@@ -28,17 +28,18 @@ class Notifier implements Serializable {
     }
   }
 
+  // build: Build object. Use currentBuild
   // context: the current progress of the build, like UNIT, WILDFLY8, JBOSSEAP
   // message: The message to be print. Default is ''
   // result: The result to be set
-  void updateBuildStatus(String context, String message = '', String result = null ){
+  void updateBuildStatus(def build, String context, String message = '', String result = null ){
     if ( result != null ){
-      currentBuild.result = result
+      build.result = result
     }
     switch(context){
       case CONTEXT_UNIT:
         if (result == 'SUCCESS'){
-          currentBuild.result = null
+          build.result = null
         }
         testResult(context, result);
         break;
@@ -47,8 +48,8 @@ class Notifier implements Serializable {
         testResult(context, result);
         break;
       case CONTEXT_FINISH:
-        if (currentBuild.result == null ){
-          currentBuild.result = 'SUCCESS'
+        if (build.result == null ){
+          build.result = 'SUCCESS'
         }
         if (result == 'SUCCESS' ){
           successful();
@@ -63,10 +64,10 @@ class Notifier implements Serializable {
   }
 
   // Revised from https://issues.jenkins-ci.org/browse/JENKINS-38674
-  void setGitHubCommitStatus(String context, String message = '' ) {
+  void setGitHubCommitStatus(def build, String context, String message = '' ) {
     def msg = message + ' ' + context + ': '\
-      + ((currentBuild.duration)? ' Duration: ' + currentBuild.durationString : '')\
-      + ((currentBuild.description)? ' Desc: ' + currentBuild.description: '')
+      + ((build.duration)? ' Duration: ' + build.durationString : '')\
+      + ((build.description)? ' Desc: ' + build.description: '')
 
     step([
       $class: 'GitHubCommitStatusSetter',
