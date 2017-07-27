@@ -1,6 +1,7 @@
 package org.zanata.jenkins
 
 class Notifier implements Serializable {
+  public static final String CONTEXT_STARTED = "STARTED"
   public static final String CONTEXT_UNIT = "UNIT"
   public static final String CONTEXT_JBOSSEAP = "JBOSSEAP"
   public static final String CONTEXT_WILDFLY8 = "WILDFLY8"
@@ -38,7 +39,10 @@ class Notifier implements Serializable {
       build.result = result
     }
     switch(context){
+      case CONTEXT_STARTED:
+        started();
       case CONTEXT_UNIT:
+        // Too early to claim success
         if (result == 'SUCCESS'){
           build.result = null
         }
