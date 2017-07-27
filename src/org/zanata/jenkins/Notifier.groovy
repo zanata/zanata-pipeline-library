@@ -10,9 +10,10 @@ class Notifier implements Serializable {
   private def steps
   private def repoUrl
 
-  Notifier(env, steps) {
+  Notifier(env, steps, repoUrl = '') {
     this.env = env
     this.steps = steps
+    this.repoUrl = repoUrl
   }
 
   void started() {
@@ -73,7 +74,7 @@ class Notifier implements Serializable {
     steps.step([
       $class: 'GitHubCommitStatusSetter',
       // Use properties GithubProjectProperty
-      reposSource: [$class: "ManuallyEnteredRepositorySource", url: "${env.CHANGE_URL}" ],
+      reposSource: [$class: "ManuallyEnteredRepositorySource", url: repoUrl ],
       errorHandlers: [[$class: 'ShallowAnyErrorHandler']],
       statusResultSource: [
         $class: 'ConditionalStatusResultSource',
