@@ -29,7 +29,12 @@ class Notifier implements Serializable {
   }
 
   // context: the current progress of the build, like UNIT, WILDFLY8, JBOSSEAP
-  void updateBuildStatus(String context, String result, String message = '' ){
+  // message: The message to be print. Default is ''
+  // result: The result to be set
+  void updateBuildStatus(String context, String message = '', String result = null ){
+    if ( result != null ){
+      currentBuild.result = result
+    }
     switch(context){
       case CONTEXT_UNIT:
         if (result == 'SUCCESS'){
@@ -39,10 +44,12 @@ class Notifier implements Serializable {
         break;
       case CONTEXT_WILDFLY8:
       case CONTEXT_JBOSSEAP:
-        currentBuild.result = result
         testResult(context, result);
-        return;
+        break;
       case CONTEXT_FINISH:
+        if (currentBuild.result == null ){
+          currentBuild.result = 'SUCCESS'
+        }
         if (result == 'SUCCESS' ){
           successful();
         }else{
@@ -50,7 +57,6 @@ class Notifier implements Serializable {
         }
         break;
       default:
-        currentBuild.result = result;
         break;
     }
     setGitHubCommitStatus(context, message)
