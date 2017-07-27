@@ -10,10 +10,9 @@ class Notifier implements Serializable {
   private def steps
   private def repoUrl
 
-  Notifier(env, steps, repoUrl='') {
+  Notifier(env, steps) {
     this.env = env
     this.steps = steps
-    this.repoUrl = repoUrl
   }
 
   void started() {
@@ -65,8 +64,7 @@ class Notifier implements Serializable {
 
     step([
       $class: 'GitHubCommitStatusSetter',
-      // Ensure it picked up from the specified URL, not zanata-pipeline-library
-      reposSource: [$class: "ManuallyEnteredRepositorySource", url: repoUrl ],
+      // Use properties GithubProjectProperty
 
       errorHandlers: [[$class: 'ShallowAnyErrorHandler']],
       statusResultSource: [
