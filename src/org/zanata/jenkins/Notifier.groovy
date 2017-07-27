@@ -70,7 +70,6 @@ class Notifier implements Serializable {
       + ((build.durationString)? ' Duration: ' + build.durationString : '')\
       + ((build.description)? ' Desc: ' + build.description: '')
 
-    echo "env.CHANGE_URL= ${env.CHANGE_URL}"
     steps.step([
       $class: 'GitHubCommitStatusSetter',
       // Use properties GithubProjectProperty
