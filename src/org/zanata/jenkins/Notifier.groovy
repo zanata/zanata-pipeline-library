@@ -69,7 +69,7 @@ class Notifier implements Serializable {
       + ((build.durationString)? ' Duration: ' + build.durationString : '')\
       + ((build.description)? ' Desc: ' + build.description: '')
 
-    step([
+    steps.step([
       $class: 'GitHubCommitStatusSetter',
       // Use properties GithubProjectProperty
 
