@@ -41,20 +41,24 @@ class Notifier implements Serializable {
     switch(context){
       case CONTEXT_STARTED:
         started();
+        if (build.result == 'SUCCESS'){
+          build.result = null
+        }
+        break;
       case CONTEXT_UNIT:
       case CONTEXT_WILDFLY8:
       case CONTEXT_JBOSSEAP:
       // Too early to claim success
-        if (result == 'SUCCESS'){
+        if (build.result == 'SUCCESS'){
           build.result = null
         }
-        testResults(context, result);
+        testResults(context, build.result);
         break;
       case CONTEXT_FINISH:
         if (build.result == null ){
           build.result = 'SUCCESS'
         }
-        if (result == 'SUCCESS' ){
+        if (build.result == 'SUCCESS' ){
           successful();
         }else{
           failed();
