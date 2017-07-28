@@ -42,14 +42,12 @@ class Notifier implements Serializable {
       case CONTEXT_STARTED:
         started();
       case CONTEXT_UNIT:
-        // Too early to claim success
+      case CONTEXT_WILDFLY8:
+      case CONTEXT_JBOSSEAP:
+      // Too early to claim success
         if (result == 'SUCCESS'){
           build.result = null
         }
-        testResults(context, result);
-        break;
-      case CONTEXT_WILDFLY8:
-      case CONTEXT_JBOSSEAP:
         testResults(context, result);
         break;
       case CONTEXT_FINISH:
