@@ -11,11 +11,14 @@ class Notifier implements Serializable {
   private def env
   private def steps
   private def repoUrl
+  private def contextString
 
-  Notifier(env, steps, repoUrl = null) {
+  Notifier(env, steps, build = null, repoUrl = null, contextString = null) {
+    this.build = build
     this.env = env
     this.steps = steps
     this.repoUrl = repoUrl
+    this.contextString = (contextString) ?: env.JOB_NAME
   }
 
   void started(def build = null ) {
@@ -33,9 +36,7 @@ class Notifier implements Serializable {
     if (currentBuildResult == null || currentBuildResult == 'SUCCESS'){
       // For some reason, currentBuildResult==null triggers NPE
       // at hudson.model.Result.fromString(Result.java:152)
-      if (currentBuildResult != null){
-        build.result = null
-      }
+      build.result = null
       summary="TEST PASSED ($testType)"
       sendHipChat color: "GREEN", notify: true, message: "$summary: Job " + jobLinkHtml()
     }else{
@@ -47,26 +48,29 @@ class Notifier implements Serializable {
    }
 
   void finish(String message = ''){
+    String postfix=((build.durationString)? ' Duration: ' + build.durationString : '')
     if (build.result == null ){
       build.result = 'SUCCESS'
     }
     if (build.result == 'SUCCESS' ){
-      successful(message);
+      successful(message + postfix);
     }else{
-      failed(message);
+      failed(message + postfix);
     }
   }
 
   // Revised from https://issues.jenkins-ci.org/browse/JENKINS-38674
-  private void updateGitHubCommitStatus(String message) {
-    def msg = message\
-      + ((build.durationString)? ' Duration: ' + build.durationString : '')\
-      + ((build.description)? ' Desc: ' + build.description: '')
+  private void updateGitHubCommitStatus(String message, String context = null) {
+    def msg = message +
+      ((build.durationString)? ' Duration: ' + build.durationString : '') +
+      ((build.description)? ' Desc: ' + build.description: '')
+    def ctx = context ?: contextString
 
     steps.step([
       $class: 'GitHubCommitStatusSetter',
       // Use properties GithubProjectProperty
       reposSource: [$class: "ManuallyEnteredRepositorySource", url: repoUrl ],
+      contextSource: [$class: 'ManuallyEnteredCommitContextSource', context: ctx],
       errorHandlers: [[$class: 'ShallowAnyErrorHandler']],
       statusResultSource: [
         $class: 'ConditionalStatusResultSource',
