@@ -24,7 +24,7 @@ class Notifier implements Serializable {
     updateGitHubCommitStatus('STARTED: ')
   }
 
-  void testResults(def testType, def currentBuildResult) {
+  void testResults(def testType, def currentBuildResult, def message = '') {
     // if tests have failed currentBuild.result will be 'UNSTABLE'
     String summary
     if (currentBuildResult == 'SUCCESS'){
@@ -39,7 +39,7 @@ class Notifier implements Serializable {
       summary="TEST FAILED ($testType)"
       sendHipChat color: "YELLOW", notify: true, message: "$summary: Job " + jobLinkHtml()
     }
-    updateGitHubCommitStatus("$summary: ")
+    updateGitHubCommitStatus("$summary: $message ")
    }
 
   void finish(String message = ''){
