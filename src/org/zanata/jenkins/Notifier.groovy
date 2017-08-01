@@ -7,72 +7,55 @@ class Notifier implements Serializable {
   public static final String CONTEXT_WILDFLY8 = "WILDFLY8"
   // Build is finished
   public static final String CONTEXT_FINISH = "FINISH"
+  private def build
   private def env
   private def steps
   private def repoUrl
 
-  Notifier(env, steps, repoUrl = '') {
+  Notifier(env, steps, build = null, repoUrl = null) {
+    this.build = build
     this.env = env
     this.steps = steps
     this.repoUrl = repoUrl
   }
 
-  void started() {
+  void started(def build = null) {
     sendHipChat color: "GRAY", notify: true, message: "STARTED: Job " + jobLinkHtml()
+    updateGitHubCommitStatus('STARTED: ')
   }
 
   void testResults(def testType, def currentBuildResult) {
     // if tests have failed currentBuild.result will be 'UNSTABLE'
-    if (currentBuildResult == null || currentBuildResult == 'SUCCESS') {
-      sendHipChat color: "GREEN", notify: true, message: "TESTS PASSED ($testType): Job " + jobLinkHtml()
+    String summary
+    if (currentBuildResult == 'SUCCESS'){
+      build.result = null
+    }else{
+      build.result = currentBuildResult
+    }
+    if (build.result == null) {
+      summary="TEST PASSED ($testType)"
+      sendHipChat color: "GREEN", notify: true, message: "$summary: Job " + jobLinkHtml()
     } else {
-      sendHipChat color: "YELLOW", notify: true, message: "TESTS FAILED ($testType): Job " + jobLinkHtml()
+      summary="TEST FAILED ($testType)"
+      sendHipChat color: "YELLOW", notify: true, message: "$summary: Job " + jobLinkHtml()
     }
-  }
+    updateGitHubCommitStatus("$summary: ")
+   }
 
-  // build: Build object. Use currentBuild
-  // context: the current progress of the build, like UNIT, WILDFLY8, JBOSSEAP
-  // message: The message to be print. Default is ''
-  // result: The result to be set
-  void updateBuildStatus(def build, String context, String message = '', String result = null ){
-    if ( result != null ){
-      build.result = result
+  void finish(String message = ''){
+    if (build.result == null ){
+      build.result = 'SUCCESS'
     }
-    switch(context){
-      case CONTEXT_STARTED:
-        started();
-        if (build.result == 'SUCCESS'){
-          build.result = null
-        }
-        break;
-      case CONTEXT_UNIT:
-      case CONTEXT_WILDFLY8:
-      case CONTEXT_JBOSSEAP:
-      // Too early to claim success
-        if (build.result == 'SUCCESS'){
-          build.result = null
-        }
-        testResults(context, build.result);
-        break;
-      case CONTEXT_FINISH:
-        if (build.result == null ){
-          build.result = 'SUCCESS'
-        }
-        if (build.result == 'SUCCESS' ){
-          successful();
-        }else{
-          failed();
-        }
-        break;
-      default:
-        break;
+    if (build.result == 'SUCCESS' ){
+      successful();
+    }else{
+      failed();
     }
-    setGitHubCommitStatus(build, context, message)
   }
 
   // Revised from https://issues.jenkins-ci.org/browse/JENKINS-38674
-  void setGitHubCommitStatus(def build, String context, String message = '' ) {
-    def msg = message + ' ' + context + ': '\
+  private void updateGitHubCommitStatus(String message) {
+    def msg = message\
       + ((build.durationString)? ' Duration: ' + build.durationString : '')\
       + ((build.description)? ' Desc: ' + build.description: '')
 
@@ -87,6 +70,7 @@ class Notifier implements Serializable {
           [$class: 'BetterThanOrEqualBuildResult', result: 'SUCCESS', state: 'SUCCESS', message: msg ],
           [$class: 'BetterThanOrEqualBuildResult', result: 'UNSTABLE', state: 'UNSTABLE', message: msg ],
           [$class: 'BetterThanOrEqualBuildResult', result: 'FAILURE', state: 'FAILURE', message: msg ],
+          [$class: 'AnyBuildResult', state: 'PENDING', message: msg ],
         ]
       ]
     ])
@@ -95,10 +79,16 @@ class Notifier implements Serializable {
 
   void successful() {
     sendHipChat color: "GRAY", notify: true, message: "SUCCESSFUL: Job " + jobLinkHtml()
+    if (build){
+      updateGitHubCommitStatus(build.result + ': ')
+    }
   }
 
   void failed() {
     sendHipChat color: "RED", notify: true, message: "FAILED: Job " + jobLinkHtml()
+    if (build){
+      updateGitHubCommitStatus(build.result + ': ')
+    }
   }
 
   private String jobLinkHtml() {
