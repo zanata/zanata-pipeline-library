@@ -26,25 +26,25 @@ class Notifier implements Serializable {
       this.build = build
     }
     sendHipChat color: "GRAY", notify: true, message: "STARTED: Job " + jobLinkHtml()
-    updateGitHubCommitStatus('STARTED: ')
+    updateGitHubCommitStatus('PENDING', 'STARTED')
   }
 
   void testResults(def testType, def currentBuildResult, def message = '') {
     assert build != null : 'Notifier.build is null'
     // if tests have failed currentBuild.result will be 'UNSTABLE'
     String summary
+    String state
     if (currentBuildResult == null || currentBuildResult == 'SUCCESS'){
-      // For some reason, currentBuildResult==null triggers NPE
-      // at hudson.model.Result.fromString(Result.java:152)
-      build.result = null
       summary="TEST PASSED ($testType)"
+      state='PENDING'
       sendHipChat color: "GREEN", notify: true, message: "$summary: Job " + jobLinkHtml()
     }else{
       build.result = currentBuildResult
       summary="TEST FAILED ($testType)"
       sendHipChat color: "YELLOW", notify: true, message: "$summary: Job " + jobLinkHtml()
+      state=currentBuildResult
     }
-    updateGitHubCommitStatus("$summary: $message ")
+    updateGitHubCommitStatus(state,"$summary: $message")
    }
 
   void finish(String message = ''){
@@ -60,10 +60,7 @@ class Notifier implements Serializable {
   }
 
   // Revised from https://issues.jenkins-ci.org/browse/JENKINS-38674
-  private void updateGitHubCommitStatus(String message, String context = null) {
-    def msg = message +
-      ((build.durationString)? ' Duration: ' + build.durationString : '') +
-      ((build.description)? ' Desc: ' + build.description: '')
+  private void updateGitHubCommitStatus(String state, String message, String context = null) {
     def ctx = context ?: contextString
 
     steps.step([
@@ -75,15 +72,11 @@ class Notifier implements Serializable {
       statusResultSource: [
         $class: 'ConditionalStatusResultSource',
         results: [
-          [$class: 'BetterThanOrEqualBuildResult', result: 'SUCCESS', state: 'SUCCESS', message: msg ],
-          [$class: 'BetterThanOrEqualBuildResult', result: 'UNSTABLE', state: 'UNSTABLE', message: msg ],
-          [$class: 'BetterThanOrEqualBuildResult', result: 'FAILURE', state: 'FAILURE', message: msg ],
-          [$class: 'AnyBuildResult', state: 'PENDING', message: msg ],
+          [$class: 'AnyBuildResult', state: state, message: message ],
         ]
       ]
     ])
   }
-
 
   void successful(String message='') {
     sendHipChat color: "GRAY", notify: true, message: "SUCCESSFUL: Job " + jobLinkHtml()
