@@ -47,9 +47,9 @@ class Notifier implements Serializable {
       build.result = 'SUCCESS'
     }
     if (build.result == 'SUCCESS' ){
-      successful();
+      successful(message);
     }else{
-      failed();
+      failed(message);
     }
   }
 
@@ -77,17 +77,17 @@ class Notifier implements Serializable {
   }
 
 
-  void successful() {
+  void successful(String message='') {
     sendHipChat color: "GRAY", notify: true, message: "SUCCESSFUL: Job " + jobLinkHtml()
     if (build){
-      updateGitHubCommitStatus(build.result + ': ')
+      updateGitHubCommitStatus(build.result + ': ' + message)
     }
   }
 
-  void failed() {
+  void failed(String message='') {
     sendHipChat color: "RED", notify: true, message: "FAILED: Job " + jobLinkHtml()
     if (build){
-      updateGitHubCommitStatus(build.result + ': ')
+      updateGitHubCommitStatus(build.result + ': ' + message)
     }
   }
 
