@@ -12,19 +12,22 @@ class Notifier implements Serializable {
   private def steps
   private def repoUrl
 
-  Notifier(env, steps, build = null, repoUrl = null) {
-    this.build = build
+  Notifier(env, steps, repoUrl = null) {
     this.env = env
     this.steps = steps
     this.repoUrl = repoUrl
   }
 
-  void started() {
+  void started(def build = null ) {
+    if (build != null){
+      this.build = build
+    }
     sendHipChat color: "GRAY", notify: true, message: "STARTED: Job " + jobLinkHtml()
     updateGitHubCommitStatus('STARTED: ')
   }
 
   void testResults(def testType, def currentBuildResult, def message = '') {
+    assert build != null : 'Notifier.build is null'
     // if tests have failed currentBuild.result will be 'UNSTABLE'
     String summary
     if (currentBuildResult == 'SUCCESS'){
