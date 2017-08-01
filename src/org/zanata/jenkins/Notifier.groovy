@@ -30,15 +30,16 @@ class Notifier implements Serializable {
     assert build != null : 'Notifier.build is null'
     // if tests have failed currentBuild.result will be 'UNSTABLE'
     String summary
-    if (currentBuildResult == 'SUCCESS'){
-      build.result = null
-    }else{
-      build.result = currentBuildResult
-    }
-    if (build.result == null) {
+    if (currentBuildResult == null || currentBuildResult == 'SUCCESS'){
+      // For some reason, currentBuildResult==null triggers NPE
+      // at hudson.model.Result.fromString(Result.java:152)
+      if (currentBuildResult != null){
+        build.result = null
+      }
       summary="TEST PASSED ($testType)"
       sendHipChat color: "GREEN", notify: true, message: "$summary: Job " + jobLinkHtml()
-    } else {
+    }else{
+      build.result = currentBuildResult
       summary="TEST FAILED ($testType)"
       sendHipChat color: "YELLOW", notify: true, message: "$summary: Job " + jobLinkHtml()
     }
