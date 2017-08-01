@@ -19,7 +19,7 @@ class Notifier implements Serializable {
     this.repoUrl = repoUrl
   }
 
-  void started(def build = null) {
+  void started() {
     sendHipChat color: "GRAY", notify: true, message: "STARTED: Job " + jobLinkHtml()
     updateGitHubCommitStatus('STARTED: ')
   }
