@@ -1,4 +1,5 @@
 package org.zanata.jenkins
+import groovy.time
 
 class Notifier implements Serializable {
   private def build
@@ -38,11 +39,18 @@ class Notifier implements Serializable {
       sendHipChat color: "YELLOW", notify: true, message: "$summary: Job " + jobLinkHtml()
       state=currentBuildResult
     }
-    updateGitHubCommitStatus(state,"$summary: $message")
+    updateGitHubCommitStatus(state, summary + (message == '' ) ? '' : ": $message")
    }
 
   void finish(def message = ''){
-    String postfix=((build.durationString)? ' Duration: ' + build.durationString : '')
+    String postfix=''
+    if (build.duration){
+      TimeDuration duration=TimeDuration((build.duration / (1000 * 60 * 60)) % 60,
+        (build.duration / (1000 * 60)) % 60,
+        (build.duration / 1000 % 60,
+        build.duration% 1000)
+      postfix=' Duration: '+duration.toString()
+    }
     if (build.result == null ){
       build.result = 'SUCCESS'
     }
