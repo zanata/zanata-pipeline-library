@@ -45,9 +45,9 @@ class Notifier implements Serializable {
     String postfix=''
     if (build.duration>0){
       int millisecond = build.duration % 1000
-      int second = build.duration / 1000 % 60
-      int minute = (build.duration / (1000 * 60)) % 60
-      int hour = (build.duration / (1000 * 60 * 60)) % 60
+      int second = build.duration.intdiv(1000) % 60
+      int minute = (build.duration.intdiv(1000 * 60)) % 60
+      int hour = (build.duration.intdiv(1000 * 60 * 60)) % 60
       postfix=' Duration: ' +
         ((hour > 0 ) ? hour + ' hr ' : '') +
         ((minute > 0 ) ? minute + ' min ' : '') +
