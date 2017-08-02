@@ -1,5 +1,4 @@
 package org.zanata.jenkins
-import groovy.time
 
 class Notifier implements Serializable {
   private def build
