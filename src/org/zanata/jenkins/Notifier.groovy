@@ -43,12 +43,16 @@ class Notifier implements Serializable {
 
   void finish(def message = ''){
     String postfix=''
-    if (build.duration){
-      TimeDuration duration=TimeDuration((build.duration / (1000 * 60 * 60)) % 60,
-        (build.duration / (1000 * 60)) % 60,
-        (build.duration / 1000 % 60),
-        build.duration% 1000)
-      postfix=' Duration: '+duration.toString()
+    if (build.duration>0){
+      int millisecond = build.duration % 1000
+      int second = build.duration / 1000 % 60
+      int minute = (build.duration / (1000 * 60)) % 60
+      int hour = (build.duration / (1000 * 60 * 60)) % 60
+      postfix=' Duration: ' +
+        ((hour > 0 ) ? hour + ' hr ' : '') +
+        ((minute > 0 ) ? minute + ' min ' : '') +
+        ((second > 0 ) ? second + ' sec ' : '') +
+        ((millisecond > 0 )? millisecond + ' ms' : '')
     }
     if (build.result == null ){
       build.result = 'SUCCESS'
