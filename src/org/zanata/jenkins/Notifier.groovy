@@ -1,12 +1,6 @@
 package org.zanata.jenkins
 
 class Notifier implements Serializable {
-  public static final String CONTEXT_STARTED = "STARTED"
-  public static final String CONTEXT_UNIT = "UNIT"
-  public static final String CONTEXT_JBOSSEAP = "JBOSSEAP"
-  public static final String CONTEXT_WILDFLY8 = "WILDFLY8"
-  // Build is finished
-  public static final String CONTEXT_FINISH = "FINISH"
   private def build
   private def env
   private def steps
@@ -47,7 +41,7 @@ class Notifier implements Serializable {
     updateGitHubCommitStatus(state,"$summary: $message")
    }
 
-  void finish(String message = ''){
+  void finish(def message = ''){
     String postfix=((build.durationString)? ' Duration: ' + build.durationString : '')
     if (build.result == null ){
       build.result = 'SUCCESS'
@@ -78,17 +72,17 @@ class Notifier implements Serializable {
     ])
   }
 
-  void successful(String message='') {
+  void successful(def message='') {
     sendHipChat color: "GRAY", notify: true, message: "SUCCESSFUL: Job " + jobLinkHtml()
     if (build){
-      updateGitHubCommitStatus(build.result + ': ' + message)
+      updateGitHubCommitStatus('SUCCESS', 'SUCCESS: ' + message)
     }
   }
 
-  void failed(String message='') {
+  void failed(def message='') {
     sendHipChat color: "RED", notify: true, message: "FAILED: Job " + jobLinkHtml()
     if (build){
-      updateGitHubCommitStatus(build.result + ': ' + message)
+      updateGitHubCommitStatus('FAILURE', 'FAILURE: ' + message)
     }
   }
 
