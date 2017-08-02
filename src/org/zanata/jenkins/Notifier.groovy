@@ -46,7 +46,7 @@ class Notifier implements Serializable {
     if (build.duration){
       TimeDuration duration=TimeDuration((build.duration / (1000 * 60 * 60)) % 60,
         (build.duration / (1000 * 60)) % 60,
-        (build.duration / 1000 % 60,
+        (build.duration / 1000 % 60),
         build.duration% 1000)
       postfix=' Duration: '+duration.toString()
     }
