@@ -13,6 +13,7 @@ class Notifier implements Serializable {
     this.steps = steps
     this.repoUrl = repoUrl
     this.jobContext = jobContext
+    steps.echo '[WARN] build is null; skipping the finish() method'
   }
 
   void started() {
@@ -60,7 +61,12 @@ class Notifier implements Serializable {
     updateGitHubCommitStatus(githubState, summary + (message == '' ) ? '' : ": $message")
   }
 
-  void finish(def message = ''){
+  void finish(String message = ''){
+    if (build == null ){
+      steps.echo '[WARN] build is null, skipping the finish() method'
+      return
+    }
+
     String postfix=''
     if (build.duration>0){
       int millisecond = build.duration % 1000
@@ -89,7 +95,7 @@ class Notifier implements Serializable {
     def ctx = overrideContext ?: jobContext
 
     if (repoUrl == null) {
-      steps.echo '[WARN]: repoUrl is null; skipping GitHub Status'
+      steps.echo '[WARN] repoUrl is null; skipping GitHub Status'
       return
     }
 
