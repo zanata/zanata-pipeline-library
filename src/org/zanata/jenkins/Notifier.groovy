@@ -1,33 +1,135 @@
 package org.zanata.jenkins
 
 class Notifier implements Serializable {
+  private def build
   private def env
   private def steps
+  private def repoUrl
+  private def jobContext
 
-  Notifier(env, steps) {
+  Notifier(env, steps, build = null, repoUrl = null, jobContext = env.JOB_NAME) {
+    this.build = build
     this.env = env
     this.steps = steps
+    this.repoUrl = repoUrl
+    this.jobContext = jobContext
+    steps.echo '[WARN] build is null; skipping the finish() method'
   }
 
   void started() {
     sendHipChat color: "GRAY", notify: true, message: "STARTED: Job " + jobLinkHtml()
+    updateGitHubCommitStatus('PENDING', 'STARTED')
   }
 
-  void testResults(def testType, def currentBuildResult) {
+  /* testResults: publish the current test results to GitHub and Hipchat
+   *
+   * testType: e.g. UNIT, WILDFLY, JBOSSEAP
+   *
+   * currentBuildResult: the current build state
+   *   null | 'SUCCESS' | 'PENDING' :
+   *     GitHub state 'PENDING', test passed, but still building
+   *
+   *   'UNSTABLE' | 'FAILURE' :
+   *     GitHub state 'FAILURE', test failed.
+   *
+   *   'ERROR':
+   *     GitHub state 'ERROR', build error.
+   *
+   * message: Additional message to be shown.
+   */
+  void testResults(def testType, def currentBuildResult, def message = '') {
     // if tests have failed currentBuild.result will be 'UNSTABLE'
-    if (currentBuildResult == null || currentBuildResult == 'SUCCESS') {
-      sendHipChat color: "GREEN", notify: true, message: "TESTS PASSED ($testType): Job " + jobLinkHtml()
+    String summary
+    String githubState
+    String hipChatColor
+    if (currentBuildResult == null || currentBuildResult == 'SUCCESS' ||
+        currentBuildResult == 'PENDING') {
+      summary="TEST PASSED ($testType)"
+      githubState='PENDING'
+      hipChatColor='GREEN'
+      sendHipChat color: "GREEN", notify: true, message: "$summary: Job " + jobLinkHtml()
+    } else if (currentBuildResult == 'ERROR') {
+      summary="TEST $currentBuildResult ($testType)"
+      hipChatColor='YELLOW'
+      githubState='ERROR'
     } else {
-      sendHipChat color: "YELLOW", notify: true, message: "TESTS FAILED ($testType): Job " + jobLinkHtml()
+      summary="TEST FAILED ($testType)"
+      hipChatColor='YELLOW'
+      githubState='FAILURE'
+    }
+    sendHipChat color: hipChatColor, notify: true, message: "$summary: Job " + jobLinkHtml()
+    updateGitHubCommitStatus(githubState, summary + (message == '' ) ? '' : ": $message")
+  }
+
+  void finish(String message = ''){
+    if (build == null ){
+      steps.echo '[WARN] build is null, skipping the finish() method'
+      return
+    }
+
+    String postfix=''
+    if (build.duration>0){
+      int millisecond = build.duration % 1000
+      int second = build.duration.intdiv(1000) % 60
+      int minute = (build.duration.intdiv(1000 * 60)) % 60
+      int hour = (build.duration.intdiv(1000 * 60 * 60)) % 60
+      postfix=' Duration: ' +
+        ((hour > 0 ) ? hour + ' hr ' : '') +
+        ((minute > 0 ) ? minute + ' min ' : '') +
+        ((second > 0 ) ? second + ' sec ' : '') +
+        ((millisecond > 0 )? millisecond + ' ms' : '')
+    }
+    if (( build.result ?: 'SUCCESS') == 'SUCCESS' ) {
+      successful(message + postfix);
+    } else if ( build.result ==  'UNSTABLE' ) {
+      failed(message + postfix);
+    } else {
+      error(message + postfix);
     }
   }
 
-  void successful() {
-    sendHipChat color: "GRAY", notify: true, message: "SUCCESSFUL: Job " + jobLinkHtml()
+  // Revised from https://issues.jenkins-ci.org/browse/JENKINS-38674
+  // GitHub commit supports following states: 'pending', 'success', 'error' or 'failure'.
+  // See: https://developer.github.com/v3/repos/statuses/
+  private void updateGitHubCommitStatus(String state, String message, String overrideContext = null) {
+    def ctx = overrideContext ?: jobContext
+
+    if (repoUrl == null) {
+      steps.echo '[WARN] repoUrl is null; skipping GitHub Status'
+      return
+    }
+
+    steps.step([
+      $class: 'GitHubCommitStatusSetter',
+      // Use properties GithubProjectProperty
+      reposSource: [$class: "ManuallyEnteredRepositorySource", url: repoUrl ],
+      contextSource: [$class: 'ManuallyEnteredCommitContextSource', context: ctx],
+      errorHandlers: [[$class: 'ShallowAnyErrorHandler']],
+      statusResultSource: [
+        $class: 'ConditionalStatusResultSource',
+        results: [
+          [$class: 'AnyBuildResult', state: state, message: message ],
+        ]
+      ]
+    ])
   }
 
-  void failed() {
+  // Build success without failed tests
+  void successful(String message='') {
+    sendHipChat color: "GRAY", notify: true, message: "SUCCESSFUL: Job " + jobLinkHtml()
+    updateGitHubCommitStatus('SUCCESS', 'SUCCESS: ' + message)
+  }
+
+  // Used when tests failure, but compile completed
+  void failed(String message='') {
     sendHipChat color: "RED", notify: true, message: "FAILED: Job " + jobLinkHtml()
+    updateGitHubCommitStatus('FAILURE', 'FAILURE: ' + message)
+  }
+
+  // Used when build failure. e.g. build system/script failed, or compile error
+  void error(String message='') {
+    sendHipChat color: "RED", notify: true, message: "ERROR: Job " + jobLinkHtml()
+    updateGitHubCommitStatus('ERROR', 'ERROR: ' + message)
   }
 
   private String jobLinkHtml() {
