@@ -114,16 +114,19 @@ class Notifier implements Serializable {
     ])
   }
 
+  // Build success without failed tests
   void successful(String message='') {
     sendHipChat color: "GRAY", notify: true, message: "SUCCESSFUL: Job " + jobLinkHtml()
     updateGitHubCommitStatus('SUCCESS', 'SUCCESS: ' + message)
   }
 
+  // Used when tests failure, but compile completed
   void failed(String message='') {
     sendHipChat color: "RED", notify: true, message: "FAILED: Job " + jobLinkHtml()
     updateGitHubCommitStatus('FAILURE', 'FAILURE: ' + message)
   }
 
+  // Used when build failure. e.g. build system/script failed, or compile error
   void error(String message='') {
     sendHipChat color: "RED", notify: true, message: "ERROR: Job " + jobLinkHtml()
     updateGitHubCommitStatus('ERROR', 'ERROR: ' + message)
