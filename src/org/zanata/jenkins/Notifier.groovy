@@ -89,7 +89,7 @@ class Notifier implements Serializable {
     def ctx = overrideContext ?: jobContext
 
     if (repoUrl == null) {
-      echo '[WARN]: repoUrl is null; skipping GitHub Status'
+      steps.echo '[WARN]: repoUrl is null; skipping GitHub Status'
       return
     }
 
@@ -108,17 +108,17 @@ class Notifier implements Serializable {
     ])
   }
 
-  void successful(def message='') {
+  void successful(String message='') {
     sendHipChat color: "GRAY", notify: true, message: "SUCCESSFUL: Job " + jobLinkHtml()
     updateGitHubCommitStatus('SUCCESS', 'SUCCESS: ' + message)
   }
 
-  void failed(def message='') {
+  void failed(String message='') {
     sendHipChat color: "RED", notify: true, message: "FAILED: Job " + jobLinkHtml()
     updateGitHubCommitStatus('FAILURE', 'FAILURE: ' + message)
   }
 
-  void error(def message='') {
+  void error(String message='') {
     sendHipChat color: "RED", notify: true, message: "ERROR: Job " + jobLinkHtml()
     updateGitHubCommitStatus('ERROR', 'ERROR: ' + message)
   }
