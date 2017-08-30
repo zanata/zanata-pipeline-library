@@ -61,24 +61,31 @@ class Notifier implements Serializable {
     updateGitHubCommitStatus(githubState, summary + (message == '' ) ? '' : ": $message")
   }
 
-  void finish(String message = ''){
-    if (build == null ){
-      steps.echo '[WARN] build is null, skipping the finish() method'
-      return
+  private String durationToString() {
+    if (build == null ) {
+      steps.echo '[WARN] build is null, duration is null'
+      return null
     }
-
-    String postfix=''
-    if (build.duration>0){
+    if (build.duration>0) {
       int millisecond = build.duration % 1000
       int second = build.duration.intdiv(1000) % 60
       int minute = (build.duration.intdiv(1000 * 60)) % 60
       int hour = (build.duration.intdiv(1000 * 60 * 60)) % 60
-      postfix=' Duration: ' +
-        ((hour > 0 ) ? hour + ' hr ' : '') +
+      return ((hour > 0 ) ? hour + ' hr ' : '') +
         ((minute > 0 ) ? minute + ' min ' : '') +
         ((second > 0 ) ? second + ' sec ' : '') +
         ((millisecond > 0 )? millisecond + ' ms' : '')
     }
+    return "0s"
+  }
+
+  void finish(String message = '') {
+    if ( build == null ) {
+      steps.echo '[WARN] build is null, skipping the finish() method'
+      return
+    }
+
+    String postfix="Duration: " + durationToString()
     if (( build.result ?: 'SUCCESS') == 'SUCCESS' ) {
       successful(message + postfix);
     } else if ( build.result ==  'UNSTABLE' ) {
@@ -118,18 +125,56 @@ class Notifier implements Serializable {
   void successful(String message='') {
     sendHipChat color: "GRAY", notify: true, message: "SUCCESSFUL: Job " + jobLinkHtml()
     updateGitHubCommitStatus('SUCCESS', 'SUCCESS: ' + message)
+    mailToCommitter(message)
   }
 
   // Used when tests failure, but compile completed
   void failed(String message='') {
     sendHipChat color: "RED", notify: true, message: "FAILED: Job " + jobLinkHtml()
     updateGitHubCommitStatus('FAILURE', 'FAILURE: ' + message)
+    mailToCommitter(message)
   }
 
   // Used when build failure. e.g. build system/script failed, or compile error
   void error(String message='') {
     sendHipChat color: "RED", notify: true, message: "ERROR: Job " + jobLinkHtml()
     updateGitHubCommitStatus('ERROR', 'ERROR: ' + message)
+    mailToCommitter(message)
+  }
+
+  private void mailToCommitter(String message='') {
+    assert build != null : 'Notifier.build is null'
+    def changes = ""
+
+    // build.changeSets might be null in TestJenkinsfile
+    if (build.changeSets != null ){
+      for(Iterator changeSetIter=build.changeSets.iterator(); changeSetIter.hasNext(); ){
+        def set=changeSetIter.next();
+        for(Iterator entryIter=set.iterator(); entryIter.hasNext(); ){
+          def entry=entryIter.next()
+          changes += "Commit ${entry.commitId} by ${entry.author.id} (${entry.author.fullName})\n"
+        }
+      }
+    }
+    steps.emailext([
+      subject: "${env.JOB_NAME} - Build #${build.id} - ${build.result?:'FAILURE'}: ${message}",
+      body:  "url: ${build.absoluteUrl}\n" +
+        "      title: ${env.CHANGE_TITLE?:''}\n" +
+        "     author: ${env.CHANGE_AUTHOR}\n" +
+        "        job: ${env.JOB_NAME}\n" +
+        "   build id: ${build.id}\n" +
+        "     branch: ${env.BRANCH_NAME}\n" +
+        "     target: ${env.CHANGE_TARGET?:''}\n" +
+        "   duration: " + durationToString() + " \n" +
+        "     result: ${build.result?:'FAILURE'}\n" +
+        "description: ${build.description?:''}\n" +
+        "    message: ${message}\n" +
+        "    changes: ${changes}\n",
+        recipientProviders: [
+        [$class: 'CulpritsRecipientProvider'],
+        [$class: 'RequesterRecipientProvider'],
+      ],
+    ])
   }
 
   private String jobLinkHtml() {
