@@ -41,7 +41,7 @@ class Notifier implements Serializable {
    *
    * message: Additional message to be shown.
    */
-  void testResults(def testType, def currentBuildResult, def message = '') {
+  void testResults(testType, currentBuildResult, message = '') {
     // if tests have failed currentBuild.result will be 'UNSTABLE'
     String summary
     String githubState
@@ -65,7 +65,7 @@ class Notifier implements Serializable {
     updateGitHubCommitStatus(githubState, summary + (message == '' ) ? '' : ": $message")
   }
 
-  void finish(String message = ''){
+  void finish(message = ''){
     if (build == null ){
       steps.echo '[WARN] build is null, skipping the finish() method'
       return
@@ -84,11 +84,11 @@ class Notifier implements Serializable {
         ((millisecond > 0 )? millisecond + ' ms' : '')
     }
     if (( build.result ?: 'SUCCESS') == 'SUCCESS' ) {
-      successful(message + postfix);
+      successful(message.toString() + postfix);
     } else if ( build.result ==  'UNSTABLE' ) {
-      failed(message + postfix);
+      failed(message.toString() + postfix);
     } else {
-      error(message + postfix);
+      error(message.toString() + postfix);
     }
   }
 
@@ -119,21 +119,21 @@ class Notifier implements Serializable {
   }
 
   // Build success without failed tests
-  void successful(String message='') {
+  void successful(message='') {
     sendHipChat color: "GRAY", notify: true, message: "SUCCESSFUL: Job " + jobLinkHtml()
-    updateGitHubCommitStatus('SUCCESS', 'SUCCESS: ' + message)
+    updateGitHubCommitStatus('SUCCESS', 'SUCCESS: ' + message.toString())
   }
 
   // Used when tests failure, but compile completed
-  void failed(String message='') {
+  void failed(message='') {
     sendHipChat color: "RED", notify: true, message: "FAILED: Job " + jobLinkHtml()
-    updateGitHubCommitStatus('FAILURE', 'FAILURE: ' + message)
+    updateGitHubCommitStatus('FAILURE', 'FAILURE: ' + message.toString())
   }
 
   // Used when build failure. e.g. build system/script failed, or compile error
-  void error(String message='') {
+  void error(message='') {
     sendHipChat color: "RED", notify: true, message: "ERROR: Job " + jobLinkHtml()
-    updateGitHubCommitStatus('ERROR', 'ERROR: ' + message)
+    updateGitHubCommitStatus('ERROR', 'ERROR: ' + message.toString())
   }
 
   private String jobLinkHtml() {
