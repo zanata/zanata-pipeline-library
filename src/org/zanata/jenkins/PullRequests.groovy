@@ -3,6 +3,9 @@ package org.zanata.jenkins
 import com.cloudbees.groovy.cps.NonCPS
 import groovy.json.JsonSlurper
 
+/**
+ * @author Sean Flanigan <a href="mailto:sflaniga@redhat.com">sflaniga@redhat.com</a>
+ */
 class PullRequests implements Serializable {
 
   @NonCPS

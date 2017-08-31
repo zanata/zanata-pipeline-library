@@ -2,6 +2,9 @@ package org.zanata.jenkins
 
 import com.cloudbees.groovy.cps.NonCPS
 
+/**
+ * @author Sean Flanigan <a href="mailto:sflaniga@redhat.com">sflaniga@redhat.com</a>
+ */
 class Strings implements Serializable {
 
   // Based on http://stackoverflow.com/a/37688740/14379
