@@ -3,6 +3,7 @@ package org.zanata.jenkins
 /**
  * @author Sean Flanigan <a href="mailto:sflaniga@redhat.com">sflaniga@redhat.com</a>
  * @author Alex Eng <a href="mailto:aeng@redhat.com">aeng@redhat.com</a>
+ * @author Ding-Yi Chen <a href="mailto:dchen@redhat.com">dchen@redhat.com</a>
  */
 class Notifier implements Serializable {
   private def build
