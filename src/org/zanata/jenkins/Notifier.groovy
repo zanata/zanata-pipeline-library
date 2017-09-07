@@ -100,7 +100,7 @@ class Notifier implements Serializable {
   // See: https://developer.github.com/v3/repos/statuses/
   private void updateGitHubCommitStatus(String state, String message, String overrideContext = null) {
     def ctx = overrideContext ?: jobContext
-    String outputStr = states + ': ' + message + ( durationStr ? " Duration: " + durationStr : '')
+    String outputStr = state + ': ' + message + ( durationStr ? " Duration: " + durationStr : '')
 
     if (repoUrl == null) {
       steps.echo '[WARN] repoUrl is null; skipping GitHub Status'
