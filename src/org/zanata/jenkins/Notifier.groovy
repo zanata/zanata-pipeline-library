@@ -10,6 +10,7 @@ class Notifier implements Serializable {
   private def steps
   private def repoUrl
   private def jobContext
+  private String durationStr = null
 
   Notifier(env, steps, build = null, repoUrl = null, jobContext = env.JOB_NAME) {
     this.build = build
@@ -21,7 +22,7 @@ class Notifier implements Serializable {
   }
 
   void started() {
-    sendHipChat color: "GRAY", notify: true, message: "STARTED: Job " + jobLinkHtml()
+    sendHipChat color: "GRAY", notify: true, message: "STARTED: Job ${jobLinkHtml()}"
     updateGitHubCommitStatus('PENDING', 'STARTED')
   }
 
@@ -48,47 +49,53 @@ class Notifier implements Serializable {
     String hipChatColor
     if (currentBuildResult == null || currentBuildResult == 'SUCCESS' ||
         currentBuildResult == 'PENDING') {
-      summary="TEST PASSED ($testType)"
+      summary = "TEST PASSED ($testType)"
       githubState='PENDING'
       hipChatColor='GREEN'
-      sendHipChat color: "GREEN", notify: true, message: "$summary: Job " + jobLinkHtml()
+      sendHipChat color: "GREEN", notify: true, message: "$summary: Job ${jobLinkHtml()}"
     } else if (currentBuildResult == 'ERROR') {
-      summary="TEST $currentBuildResult ($testType)"
+      summary = "TEST $currentBuildResult ($testType)"
       hipChatColor='YELLOW'
       githubState='ERROR'
     } else {
-      summary="TEST FAILED ($testType)"
+      summary = "TEST FAILED ($testType)"
       hipChatColor='YELLOW'
       githubState='FAILURE'
     }
-    sendHipChat color: hipChatColor, notify: true, message: "$summary: Job " + jobLinkHtml()
+    sendHipChat color: hipChatColor, notify: true, message: "$summary: Job ${jobLinkHtml()}"
     updateGitHubCommitStatus(githubState, summary + (message == '' ) ? '' : ": $message")
   }
 
-  void finish(message = ''){
-    if (build == null ){
-      steps.echo '[WARN] build is null, skipping the finish() method'
-      return
+  private String durationToString() {
+    if (build == null) {
+      steps.echo '[WARN] build is null, duration is null'
+      return null
     }
-
-    String postfix=''
-    if (build.duration>0){
+    if (build.duration > 0) {
       int millisecond = build.duration % 1000
       int second = build.duration.intdiv(1000) % 60
       int minute = (build.duration.intdiv(1000 * 60)) % 60
       int hour = (build.duration.intdiv(1000 * 60 * 60)) % 60
-      postfix=' Duration: ' +
-        ((hour > 0 ) ? hour + ' hr ' : '') +
+      return ((hour > 0 ) ? hour + ' hr ' : '') +
         ((minute > 0 ) ? minute + ' min ' : '') +
         ((second > 0 ) ? second + ' sec ' : '') +
         ((millisecond > 0 )? millisecond + ' ms' : '')
     }
-    if (( build.result ?: 'SUCCESS') == 'SUCCESS' ) {
-      successful(message.toString() + postfix);
-    } else if ( build.result ==  'UNSTABLE' ) {
-      failed(message.toString() + postfix);
+    return "0s"
+  }
+
+  void finish(message = '') {
+    durationStr = durationToString()
+    if (build == null) {
+      steps.echo '[WARN] build is null, skipping the finish() method'
+      return
+    }
+    if (build.result in ['SUCCESS', null]) {
+      successful(message)
+    } else if (build.result == 'UNSTABLE') {
+      failed(message)
     } else {
-      error(message.toString() + postfix);
+      error(message)
     }
   }
 
@@ -97,6 +104,7 @@ class Notifier implements Serializable {
   // See: https://developer.github.com/v3/repos/statuses/
   private void updateGitHubCommitStatus(String state, String message, String overrideContext = null) {
     def ctx = overrideContext ?: jobContext
+    String outputStr = state + ': ' + message + ( durationStr ? " Duration: " + durationStr : '')
 
     if (repoUrl == null) {
       steps.echo '[WARN] repoUrl is null; skipping GitHub Status'
@@ -112,28 +120,68 @@ class Notifier implements Serializable {
       statusResultSource: [
         $class: 'ConditionalStatusResultSource',
         results: [
-          [$class: 'AnyBuildResult', state: state, message: message ],
+          [$class: 'AnyBuildResult', state: state, message: outputStr ],
         ]
       ]
     ])
   }
 
   // Build success without failed tests
-  void successful(message='') {
-    sendHipChat color: "GRAY", notify: true, message: "SUCCESSFUL: Job " + jobLinkHtml()
-    updateGitHubCommitStatus('SUCCESS', 'SUCCESS: ' + message.toString())
+  void successful(message = '') {
+    sendHipChat color: "GRAY", notify: true, message: "SUCCESSFUL: Job ${jobLinkHtml()}"
+    updateGitHubCommitStatus('SUCCESS', message.toString())
+    sendEmail(message)
   }
 
   // Used when tests failure, but compile completed
-  void failed(message='') {
-    sendHipChat color: "RED", notify: true, message: "FAILED: Job " + jobLinkHtml()
-    updateGitHubCommitStatus('FAILURE', 'FAILURE: ' + message.toString())
+  void failed(message = '') {
+    sendHipChat color: "RED", notify: true, message: "FAILED: Job ${jobLinkHtml()}"
+    updateGitHubCommitStatus('FAILURE', message.toString())
+    sendEmail(message)
   }
 
   // Used when build failure. e.g. build system/script failed, or compile error
-  void error(message='') {
-    sendHipChat color: "RED", notify: true, message: "ERROR: Job " + jobLinkHtml()
-    updateGitHubCommitStatus('ERROR', 'ERROR: ' + message.toString())
+  void error(message = '') {
+    // Need durationStr here as notify.finish might not be invoked
+    durationStr=durationToString()
+    sendHipChat color: "RED", notify: true, message: "ERROR: Job ${jobLinkHtml()}"
+    updateGitHubCommitStatus('ERROR', message.toString())
+    sendEmail(message)
+  }
+
+  private void sendEmail(message = '') {
+    assert build != null : 'Notifier.build is null'
+    def changes = ""
+
+    // build.changeSets might be null in TestJenkinsfile
+    if (build.changeSets != null ){
+      for(Iterator changeSetIter=build.changeSets.iterator(); changeSetIter.hasNext(); ){
+        def set=changeSetIter.next();
+        for(Iterator entryIter=set.iterator(); entryIter.hasNext(); ){
+          def entry=entryIter.next()
+          changes += "Commit ${entry.commitId} by ${entry.author.id} (${entry.author.fullName})\n"
+        }
+      }
+    }
+    steps.emailext([
+      subject: "${env.JOB_NAME} - Build #${build.id} - ${build.result?:'FAILURE'}: ${message}",
+      body:  "url: ${build.absoluteUrl}\n" +
+        "      title: ${env.CHANGE_TITLE?:''}\n" +
+        "     author: ${env.CHANGE_AUTHOR}\n" +
+        "        job: ${env.JOB_NAME}\n" +
+        "   build id: ${build.id}\n" +
+        "     branch: ${env.BRANCH_NAME}\n" +
+        "     target: ${env.CHANGE_TARGET?:''}\n" +
+        "   duration: " + durationStr?:'' + " \n" +
+        "     result: ${build.result?:'FAILURE'}\n" +
+        "description: ${build.description?:''}\n" +
+        "    message: ${message}\n" +
+        "    changes: ${changes}\n",
+        recipientProviders: [
+        [$class: 'CulpritsRecipientProvider'],
+        [$class: 'RequesterRecipientProvider'],
+      ],
+    ])
   }
 
   private String jobLinkHtml() {
@@ -145,7 +193,7 @@ class Notifier implements Serializable {
       steps.hipchatSend(
               color: p.color,
               failOnError: p.failOnError ?: false,
-              message: p.message,
+              message: p.message + (durationStr ? " Duration: " + durationStr : ''),
               notify: p.notify ?: false,
               sendAs: p.sendAs,
               textFormat: p.textFormat ?: false,
