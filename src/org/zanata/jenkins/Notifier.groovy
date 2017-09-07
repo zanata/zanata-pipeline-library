@@ -6,6 +6,7 @@ class Notifier implements Serializable {
   private def steps
   private def repoUrl
   private def jobContext
+  private String durationStr = null
 
   Notifier(env, steps, build = null, repoUrl = null, jobContext = env.JOB_NAME) {
     this.build = build
@@ -80,18 +81,17 @@ class Notifier implements Serializable {
   }
 
   void finish(String message = '') {
+    durationStr=durationToString()
     if ( build == null ) {
       steps.echo '[WARN] build is null, skipping the finish() method'
       return
     }
-
-    String postfix="Duration: " + durationToString()
     if (( build.result ?: 'SUCCESS') == 'SUCCESS' ) {
-      successful(message + postfix);
+      successful(message);
     } else if ( build.result ==  'UNSTABLE' ) {
-      failed(message + postfix);
+      failed(message);
     } else {
-      error(message + postfix);
+      error(message);
     }
   }
 
@@ -100,6 +100,7 @@ class Notifier implements Serializable {
   // See: https://developer.github.com/v3/repos/statuses/
   private void updateGitHubCommitStatus(String state, String message, String overrideContext = null) {
     def ctx = overrideContext ?: jobContext
+    String outputStr = states + ': ' + message + ( durationStr ? " Duration: " + durationStr : '')
 
     if (repoUrl == null) {
       steps.echo '[WARN] repoUrl is null; skipping GitHub Status'
@@ -115,7 +116,7 @@ class Notifier implements Serializable {
       statusResultSource: [
         $class: 'ConditionalStatusResultSource',
         results: [
-          [$class: 'AnyBuildResult', state: state, message: message ],
+          [$class: 'AnyBuildResult', state: state, message: outputStr ],
         ]
       ]
     ])
@@ -124,25 +125,27 @@ class Notifier implements Serializable {
   // Build success without failed tests
   void successful(String message='') {
     sendHipChat color: "GRAY", notify: true, message: "SUCCESSFUL: Job " + jobLinkHtml()
-    updateGitHubCommitStatus('SUCCESS', 'SUCCESS: ' + message)
-    mailToCommitter(message)
+    updateGitHubCommitStatus('SUCCESS', message)
+    sendEmail(message)
   }
 
   // Used when tests failure, but compile completed
   void failed(String message='') {
     sendHipChat color: "RED", notify: true, message: "FAILED: Job " + jobLinkHtml()
-    updateGitHubCommitStatus('FAILURE', 'FAILURE: ' + message)
-    mailToCommitter(message)
+    updateGitHubCommitStatus('FAILURE', message)
+    sendEmail(message)
   }
 
   // Used when build failure. e.g. build system/script failed, or compile error
   void error(String message='') {
+    // Need durationStr here as notify.finish might not be invoked
+    durationStr=durationToString()
     sendHipChat color: "RED", notify: true, message: "ERROR: Job " + jobLinkHtml()
-    updateGitHubCommitStatus('ERROR', 'ERROR: ' + message)
-    mailToCommitter(message)
+    updateGitHubCommitStatus('ERROR', message)
+    sendEmail(message)
   }
 
-  private void mailToCommitter(String message='') {
+  private void sendEmail(String message='') {
     assert build != null : 'Notifier.build is null'
     def changes = ""
 
@@ -165,7 +168,7 @@ class Notifier implements Serializable {
         "   build id: ${build.id}\n" +
         "     branch: ${env.BRANCH_NAME}\n" +
         "     target: ${env.CHANGE_TARGET?:''}\n" +
-        "   duration: " + durationToString() + " \n" +
+        "   duration: " + durationStr?:'' + " \n" +
         "     result: ${build.result?:'FAILURE'}\n" +
         "description: ${build.description?:''}\n" +
         "    message: ${message}\n" +
@@ -186,7 +189,7 @@ class Notifier implements Serializable {
       steps.hipchatSend(
               color: p.color,
               failOnError: p.failOnError ?: false,
-              message: p.message,
+              message: p.message + ( durationStr ? " Duration: " + durationStr : ''),
               notify: p.notify ?: false,
               sendAs: p.sendAs,
               textFormat: p.textFormat ?: false,
