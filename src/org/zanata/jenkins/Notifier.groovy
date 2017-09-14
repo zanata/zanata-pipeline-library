@@ -6,20 +6,44 @@ class Notifier implements Serializable {
   private def steps
   private def repoUrl
   private def jobContext
+  private String pipelineLibraryBranch
+  private boolean notifyPipelineLibraryScm = false
+  // Commit Id of zanata-pipeline-library
+  private String pipelineLibraryCommitId = null
   private String durationStr = null
+  private static final String libraryRepoUrl = "https://github.com/zanata/zanata-pipeline-library.git"
 
-  Notifier(env, steps, build = null, repoUrl = null, jobContext = env.JOB_NAME) {
+  Notifier(env, steps, build = null, repoUrl = null, jobContext = env.JOB_NAME, String pipelineLibraryBranch = 'master' ) {
     this.build = build
     this.env = env
+    this.pipelineLibraryBranch = pipelineLibraryBranch
     this.steps = steps
     this.repoUrl = repoUrl
     this.jobContext = jobContext
-    steps.echo '[WARN] build is null; skipping the finish() method'
   }
 
+  // Make sure this is call before SCM checkout to get the pipelineLibraryCommitId
   void started() {
     sendHipChat color: "GRAY", notify: true, message: "STARTED: Job " + jobLinkHtml()
+
+    // Determine whether pipeline-library need to be informed
+    pipelineLibraryCommitId = steps.sh([
+      returnStdout:true,
+      script: "git ls-remote " + libraryRepoUrl + " refs/heads/" +
+        pipelineLibraryBranch + "| sed -e 's/\\s\\s*.*\$//'"
+    ])
+    steps.echo "pipelineLibraryCommitId: " + pipelineLibraryCommitId
+    // Getting pipeline-library master branch
+    if ( pipelineLibraryBranch != 'master' ) {
+      // pipeline-library is in pull request
+      notifyPipelineLibraryScm = true
+    }
     updateGitHubCommitStatus('PENDING', 'STARTED')
+  }
+
+  void startBuilding() {
+    sendHipChat color: "GRAY", notify: true, message: "BUILDING: Job " + jobLinkHtml()
+    updateGitHubCommitStatus('PENDING', 'BUILDING')
   }
 
   /* testResults: publish the current test results to GitHub and Hipchat
@@ -107,19 +131,41 @@ class Notifier implements Serializable {
       return
     }
 
-    steps.step([
-      $class: 'GitHubCommitStatusSetter',
-      // Use properties GithubProjectProperty
-      reposSource: [$class: "ManuallyEnteredRepositorySource", url: repoUrl ],
-      contextSource: [$class: 'ManuallyEnteredCommitContextSource', context: ctx],
-      errorHandlers: [[$class: 'ShallowAnyErrorHandler']],
-      statusResultSource: [
-        $class: 'ConditionalStatusResultSource',
-        results: [
-          [$class: 'AnyBuildResult', state: state, message: outputStr ],
+    if (notifyPipelineLibraryScm) {
+      // Set the status for zanata-pipeline-library
+      steps.step([
+        $class: 'GitHubCommitStatusSetter',
+        // Use properties GithubProjectProperty
+        reposSource: [$class: "ManuallyEnteredRepositorySource", url: libraryRepoUrl ],
+        commitShaSource: [$class: "ManuallyEnteredShaSource", sha: pipelineLibraryCommitId ],
+        contextSource: [$class: 'ManuallyEnteredCommitContextSource', context: ctx],
+        errorHandlers: [[$class: 'ShallowAnyErrorHandler']],
+        statusResultSource: [
+          $class: 'ConditionalStatusResultSource',
+          results: [
+            [$class: 'AnyBuildResult', state: state, message: outputStr ],
+          ]
         ]
-      ]
-    ])
+      ])
+    }
+
+    // COMMIT_ID is null before checkout scm
+    if (env.COMMIT_ID != null){
+      steps.step([
+        $class: 'GitHubCommitStatusSetter',
+        // Use properties GithubProjectProperty
+        reposSource: [$class: "ManuallyEnteredRepositorySource", url: repoUrl ],
+        commitShaSource: [$class: "ManuallyEnteredShaSource", sha: env.COMMIT_ID ],
+        contextSource: [$class: 'ManuallyEnteredCommitContextSource', context: ctx],
+        errorHandlers: [[$class: 'ShallowAnyErrorHandler']],
+        statusResultSource: [
+          $class: 'ConditionalStatusResultSource',
+          results: [
+            [$class: 'AnyBuildResult', state: state, message: outputStr ],
+          ]
+        ]
+      ])
+    }
   }
 
   // Build success without failed tests
