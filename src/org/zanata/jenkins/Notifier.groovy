@@ -43,10 +43,12 @@ class Notifier implements Serializable {
   }
 
   void startBuilding() {
-    latestCommitId = steps.sh([
-      returnStdout:true,
-      script: "git log --format='%H' -n 1"
-    ])
+    latestCommitId=env.COMMIT_ID
+//    latestCommitId = steps.sh([
+//      returnStdout:true,
+//      script: "git log --format='%H' -n 1"
+//    ])
+    steps.echo "latestCommitId: " + latestCommitId
     sendHipChat color: "GRAY", notify: true, message: "BUILDING: Job " + jobLinkHtml()
     updateGitHubCommitStatus('PENDING', 'BUILDING')
   }
