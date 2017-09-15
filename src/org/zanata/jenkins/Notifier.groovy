@@ -10,6 +10,7 @@ class Notifier implements Serializable {
   private boolean notifyPipelineLibraryScm = false
   // Commit Id of zanata-pipeline-library
   private String pipelineLibraryCommitId = null
+  private String latestCommitId=null
   private String durationStr = null
   private static final String libraryRepoUrl = "https://github.com/zanata/zanata-pipeline-library.git"
 
@@ -42,6 +43,10 @@ class Notifier implements Serializable {
   }
 
   void startBuilding() {
+    latestCommitId = steps.sh([
+      returnStdout:true,
+      script: "git log --format='%H' -n 1"
+    ])
     sendHipChat color: "GRAY", notify: true, message: "BUILDING: Job " + jobLinkHtml()
     updateGitHubCommitStatus('PENDING', 'BUILDING')
   }
@@ -72,18 +77,17 @@ class Notifier implements Serializable {
       summary="TEST PASSED ($testType)"
       githubState='PENDING'
       hipChatColor='GREEN'
-      sendHipChat color: "GREEN", notify: true, message: "$summary: Job " + jobLinkHtml()
     } else if (currentBuildResult == 'ERROR') {
       summary="TEST $currentBuildResult ($testType)"
-      hipChatColor='YELLOW'
       githubState='ERROR'
+      hipChatColor='YELLOW'
     } else {
       summary="TEST FAILED ($testType)"
-      hipChatColor='YELLOW'
       githubState='FAILURE'
+      hipChatColor='YELLOW'
     }
     sendHipChat color: hipChatColor, notify: true, message: "$summary: Job " + jobLinkHtml()
-    updateGitHubCommitStatus(githubState, summary + (message == '' ) ? '' : ": $message")
+    updateGitHubCommitStatus(githubState, summary + ((message == '' ) ? '' : ": $message"))
   }
 
   private String durationToString() {
@@ -150,12 +154,12 @@ class Notifier implements Serializable {
     }
 
     // COMMIT_ID is null before checkout scm
-    if (env.COMMIT_ID != null){
+    if (latestCommitId != null){
       steps.step([
         $class: 'GitHubCommitStatusSetter',
         // Use properties GithubProjectProperty
         reposSource: [$class: "ManuallyEnteredRepositorySource", url: repoUrl ],
-        commitShaSource: [$class: "ManuallyEnteredShaSource", sha: env.COMMIT_ID ],
+        commitShaSource: [$class: "ManuallyEnteredShaSource", sha: latestCommitId ],
         contextSource: [$class: 'ManuallyEnteredCommitContextSource', context: ctx],
         errorHandlers: [[$class: 'ShallowAnyErrorHandler']],
         statusResultSource: [
