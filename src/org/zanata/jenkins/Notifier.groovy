@@ -26,7 +26,6 @@ class Notifier implements Serializable {
         this.jobContext = jobContext
     }
 
-    // Make sure this is call before SCM checkout to get the pipelineLibraryCommitId
     void started() {
         sendHipChat color: "GRAY", notify: true, message: "STARTED: Job " + jobLinkHtml()
 
@@ -37,6 +36,14 @@ class Notifier implements Serializable {
             pipelineLibraryBranch,
         ]).split()[0]
         steps.echo "pipelineLibraryCommitId: " + pipelineLibraryCommitId
+
+        currentCommitId =  steps.sh([
+            returnStdout:true,
+            script: 'git ls-remote ' + repoUrl + ' refs/' +
+                ( env.CHANGE_ID == null ) ? 'heads/' + env.BUILD_BRANCH :
+                    'pull/' + env.CHANGE_ID + '/head'
+        ]).split()[0]
+        steps.echo "currentCommitId: " + currentCommitId
         // Getting pipeline-library master branch
         if ( pipelineLibraryBranch != 'master' ) {
             // pipeline-library is in pull request
