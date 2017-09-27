@@ -31,12 +31,11 @@ class Notifier implements Serializable {
         sendHipChat color: "GRAY", notify: true, message: "STARTED: Job " + jobLinkHtml()
 
         // Determine whether pipeline-library need to be informed
-        String pipelineLibraryCommitLine = steps.sh([
+        pipelineLibraryCommitId =  steps.sh([
             returnStdout:true,
             script: "git ls-remote " + libraryRepoUrl + " refs/heads/" +
-                pipelineLibraryBranch,
-            ])
-        pipelineLibraryCommitId = pipelineLibraryCommitLine.split()[0]
+            pipelineLibraryBranch,
+        ]).split()[0]
         steps.echo "pipelineLibraryCommitId: " + pipelineLibraryCommitId
         // Getting pipeline-library master branch
         if ( pipelineLibraryBranch != 'master' ) {
