@@ -7,10 +7,13 @@ class Notifier implements Serializable {
     private def repoUrl
     private def jobContext
     private String pipelineLibraryBranch
+    // Whether to update commit status of pipeline-library
     private boolean notifyPipelineLibraryScm = false
+    // Whether to update commit status of the main repo (the repo that call the pipelinie-library)
+    private boolean notifyMainScm = false
     // Commit Id of zanata-pipeline-library
     private String pipelineLibraryCommitId = null
-    private String latestCommitId=null
+    private String currentCommitId = null
     private String durationStr = null
     private static final String libraryRepoUrl = "https://github.com/zanata/zanata-pipeline-library.git"
 
@@ -32,7 +35,7 @@ class Notifier implements Serializable {
             returnStdout:true,
             script: "git ls-remote " + libraryRepoUrl + " refs/heads/" +
                 pipelineLibraryBranch,
-            ]).split()[0]
+            ])
         pipelineLibraryCommitId = pipelineLibraryCommitLine.split()[0]
         steps.echo "pipelineLibraryCommitId: " + pipelineLibraryCommitId
         // Getting pipeline-library master branch
@@ -44,8 +47,11 @@ class Notifier implements Serializable {
     }
 
     void startBuilding() {
-        latestCommitId=env.COMMIT_ID
-        steps.echo "latestCommitId: " + latestCommitId
+        currentCommitId=steps.sh([
+            returnStdout:true,
+            script: "git rev-parse HEAD",
+        ])
+        steps.echo "currentCommitId: " + currentCommitId
         sendHipChat color: "GRAY", notify: true, message: "BUILDING: Job " + jobLinkHtml()
         updateGitHubCommitStatus('PENDING', 'BUILDING')
     }
@@ -153,12 +159,12 @@ class Notifier implements Serializable {
         }
 
         // COMMIT_ID is null before checkout scm
-        if (latestCommitId != null){
+        if (currentCommitId != null){
             steps.step([
                 $class: 'GitHubCommitStatusSetter',
                 // Use properties GithubProjectProperty
                 reposSource: [$class: "ManuallyEnteredRepositorySource", url: repoUrl ],
-                commitShaSource: [$class: "ManuallyEnteredShaSource", sha: latestCommitId ],
+                commitShaSource: [$class: "ManuallyEnteredShaSource", sha: currentCommitId ],
                 contextSource: [$class: 'ManuallyEnteredCommitContextSource', context: ctx],
                 errorHandlers: [[$class: 'ShallowAnyErrorHandler']],
                 statusResultSource: [
