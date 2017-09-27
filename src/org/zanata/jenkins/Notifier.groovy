@@ -197,19 +197,17 @@ class Notifier implements Serializable {
     private String obtainCommitId(String url, String branch ) {
         String result = null
         String refString = null
-        steps.echo "branch=$branch"
         if ( branch ==~ /PR-.*/ ) {
             // Pull request does not show real branch name
             refString = "refs/pull/" + env.CHANGE_ID + "/head"
         } else {
             refString = "refs/heads/" + branch
         }
-        steps.echo "refString=$refString"
         String commitLine = steps.sh([
             returnStdout: true,
             script: "git ls-remote " + url + " " + refString,
         ])
-        return (commitLine.split())[0]
+        return commitLine.split()[0]
     }
 
     private void sendEmail(String message='') {
