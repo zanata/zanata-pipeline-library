@@ -47,10 +47,10 @@ class Notifier implements Serializable {
 
     void startBuilding() {
         currentCommitId =  steps.sh([
-            returnStdout:true,
-            script: 'git ls-remote ' + repoUrl + ' refs/' +
-                ( env.CHANGE_ID == null ) ? 'heads/' + env.BRANCH_NAME :
-                    'pull/' + env.CHANGE_ID + '/head'
+            returnStdout: true,
+            script: "git ls-remote " + repoUrl + " refs/" +
+                ( env.CHANGE_ID == null ) ? "heads/" + env.BRANCH_NAME :
+                    "pull/" + env.CHANGE_ID + "/head",
         ]).split()[0]
         steps.echo "currentCommitId: " + currentCommitId
         sendHipChat color: "GRAY", notify: true, message: "BUILDING: Job " + jobLinkHtml()
