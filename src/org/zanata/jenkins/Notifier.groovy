@@ -10,9 +10,9 @@ class Notifier implements Serializable {
     // Whether to update commit status of pipeline-library
     private boolean notifyPipelineLibraryScm = false
     // Whether to update commit status of the main repo (the repo that call the pipelinie-library)
-    private boolean notifyMainScm = false
     // Commit Id of zanata-pipeline-library
     private String pipelineLibraryCommitId = null
+    // Commit Id of main repo
     private String currentCommitId = null
     private String durationStr = null
     private static final String libraryRepoUrl = "https://github.com/zanata/zanata-pipeline-library.git"
@@ -30,11 +30,7 @@ class Notifier implements Serializable {
         sendHipChat color: "GRAY", notify: true, message: "STARTED: Job " + jobLinkHtml()
 
         // Determine whether pipeline-library need to be informed
-        pipelineLibraryCommitId =  steps.sh([
-            returnStdout:true,
-            script: "git ls-remote " + libraryRepoUrl + " refs/heads/" +
-            pipelineLibraryBranch,
-        ]).split()[0]
+        pipelineLibraryCommitId = obtainCommitId(libraryRepoUrl, pipelineLibraryBranch)
         steps.echo "pipelineLibraryCommitId: " + pipelineLibraryCommitId
 
         // Getting pipeline-library master branch
@@ -48,17 +44,7 @@ class Notifier implements Serializable {
     void startBuilding() {
         // Git References
         String refString
-        if ( env.CHANGE_ID == null ) {
-            // master or release
-            refString = "refs/heads/" + env.BRANCH_NAME
-        } else {
-            // Pull Requests
-            refString = "refs/pull/" + env.CHANGE_ID + "/head"
-        }
-        currentCommitId =  steps.sh([
-            returnStdout: true,
-            script: "git ls-remote " + repoUrl + " " + refString,
-        ]).split()[0]
+        currentCommitId = obtainCommitId(repoUrl, env.BRANCH_NAME)
         steps.echo "currentCommitId: " + currentCommitId
         sendHipChat color: "GRAY", notify: true, message: "BUILDING: Job " + jobLinkHtml()
         updateGitHubCommitStatus('PENDING', 'BUILDING')
@@ -114,9 +100,9 @@ class Notifier implements Serializable {
             int minute = (build.duration.intdiv(1000 * 60)) % 60
             int hour = (build.duration.intdiv(1000 * 60 * 60)) % 60
             return ((hour > 0 ) ? hour + ' hr ' : '') +
-            ((minute > 0 ) ? minute + ' min ' : '') +
-            ((second > 0 ) ? second + ' sec ' : '') +
-            ((millisecond > 0 )? millisecond + ' ms' : '')
+                ((minute > 0 ) ? minute + ' min ' : '') +
+                ((second > 0 ) ? second + ' sec ' : '') +
+                ((millisecond > 0 )? millisecond + ' ms' : '')
         }
         return "0s"
     }
@@ -208,6 +194,24 @@ class Notifier implements Serializable {
         sendEmail(message)
     }
 
+    private String obtainCommitId(String url, String branch ) {
+        String result = null
+        String refString = null
+        steps.echo "branch=$branch"
+        if ( branch ==~ /PR-.*/ ) {
+            // Pull request does not show real branch name
+            refString = "refs/pull/" + env.CHANGE_ID + "/head"
+        } else {
+            refString = "refs/heads/" + branch
+        }
+        steps.echo "refString=$refString"
+        String commitLine = steps.sh([
+            returnStdout: true,
+            script: "git ls-remote " + url + " " + refString,
+        ])
+        return (commitLine.split())[0]
+    }
+
     private void sendEmail(String message='') {
         assert build != null : 'Notifier.build is null'
             def changes = ""
@@ -225,22 +229,22 @@ class Notifier implements Serializable {
         steps.emailext([
             subject: "${env.JOB_NAME} - Build #${build.id} - ${build.result?:'FAILURE'}: ${message}",
             body:  "url: ${build.absoluteUrl}\n" +
-            "      title: ${env.CHANGE_TITLE?:''}\n" +
-            "     author: ${env.CHANGE_AUTHOR}\n" +
-            "        job: ${env.JOB_NAME}\n" +
-            "   build id: ${build.id}\n" +
-            "     branch: ${env.BRANCH_NAME}\n" +
-            "     target: ${env.CHANGE_TARGET?:''}\n" +
-            "   duration: " + durationStr?:'' + " \n" +
-            "     result: ${build.result?:'FAILURE'}\n" +
-            "description: ${build.description?:''}\n" +
-            "    message: ${message}\n" +
-            "    changes: ${changes}\n",
+                "      title: ${env.CHANGE_TITLE?:''}\n" +
+                "     author: ${env.CHANGE_AUTHOR}\n" +
+                "        job: ${env.JOB_NAME}\n" +
+                "   build id: ${build.id}\n" +
+                "     branch: ${env.BRANCH_NAME}\n" +
+                "     target: ${env.CHANGE_TARGET?:''}\n" +
+                "   duration: " + durationStr?:'' + " \n" +
+                "     result: ${build.result?:'FAILURE'}\n" +
+                "description: ${build.description?:''}\n" +
+                "    message: ${message}\n" +
+                "    changes: ${changes}\n",
             recipientProviders: [
-            [$class: 'CulpritsRecipientProvider'],
-            [$class: 'RequesterRecipientProvider'],
+                [$class: 'CulpritsRecipientProvider'],
+                [$class: 'RequesterRecipientProvider'],
             ],
-            ])
+        ])
     }
 
     private String jobLinkHtml() {
