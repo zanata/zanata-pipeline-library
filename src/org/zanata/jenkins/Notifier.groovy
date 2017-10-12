@@ -1,4 +1,5 @@
 package org.zanata.jenkins
+import org.zanata.jenkins.ScmGit
 
 class Notifier implements Serializable {
     private def build
@@ -6,6 +7,7 @@ class Notifier implements Serializable {
     private def steps
     private def repoUrl
     private def jobContext
+    private ScmGit scmGit
     private String pipelineLibraryBranch
     // Whether to update commit status of pipeline-library
     private boolean notifyPipelineLibraryScm = false
@@ -24,13 +26,14 @@ class Notifier implements Serializable {
         this.steps = steps
         this.repoUrl = repoUrl
         this.jobContext = jobContext
+        scmGit = new ScmGit(env, steps, repoUrl)
     }
 
     void started() {
         sendHipChat color: "GRAY", notify: true, message: "STARTED: Job " + jobLinkHtml()
 
         // Determine whether pipeline-library need to be informed
-        pipelineLibraryCommitId = obtainCommitId(libraryRepoUrl, pipelineLibraryBranch)
+        pipelineLibraryCommitId = scmGit.getCommitId(pipelineLibraryBranch, libraryRepoUrl)
         steps.echo "pipelineLibraryCommitId: " + pipelineLibraryCommitId
 
         // Getting pipeline-library master branch
@@ -43,8 +46,7 @@ class Notifier implements Serializable {
 
     void startBuilding() {
         // Git References
-        String refString
-        currentCommitId = obtainCommitId(repoUrl, env.BRANCH_NAME)
+        currentCommitId = scmGit.getCommitId(env.BRANCH_NAME)
         steps.echo "currentCommitId: " + currentCommitId
         sendHipChat color: "GRAY", notify: true, message: "BUILDING: Job " + jobLinkHtml()
         updateGitHubCommitStatus('PENDING', 'BUILDING')
@@ -192,22 +194,6 @@ class Notifier implements Serializable {
         sendHipChat color: "RED", notify: true, message: "ERROR: Job " + jobLinkHtml()
         updateGitHubCommitStatus('ERROR', message)
         sendEmail(message)
-    }
-
-    private String obtainCommitId(String url, String branch ) {
-        String result = null
-        String refString = null
-        if ( branch ==~ /PR-.*/ ) {
-            // Pull request does not show real branch name
-            refString = "refs/pull/" + env.CHANGE_ID + "/head"
-        } else {
-            refString = "refs/heads/" + branch
-        }
-        String commitLine = steps.sh([
-            returnStdout: true,
-            script: "git ls-remote " + url + " " + refString,
-        ])
-        return commitLine.split()[0]
     }
 
     private void sendEmail(String message='') {
