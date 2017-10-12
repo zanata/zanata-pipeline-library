@@ -1,26 +1,15 @@
 package org.zanata.jenkins
 import org.zanata.jenkins.ScmGit
 import hudson.AbortException
+import com.cloudbees.groovy.cps.NonCPS
+
 
 class Reporting implements Serializable {
-  private def build
-  private def env
-  private def steps
-  private def repoUrl
-  private ScmGit scmGit
-  // Commit Id of main repo
-  private String currentCommitId = null
-
-  Reporting(env, steps, repoUrl) {
-    this.build = build
-    this.env = env
-    this.steps = steps
-    this.repoUrl = repoUrl
-    scmGit = new ScmGit(env, steps, repoUrl)
-  }
 
   // Send test coverage data to codecov.io
-  void codecov(){
+  @NonCPS
+  static void codecov(def env, def steps, String repoUrl){
+    ScmGit scmGit = new ScmGit(env, steps, repoUrl)
     String sha = scmGit.getCommitId(env.BRANCH_NAME)
     try {
       withCredentials(
@@ -38,5 +27,4 @@ class Reporting implements Serializable {
       steps.echo "[WARNING] Ignoring codecov error: $e"
     }
   }
-
 }
