@@ -11,6 +11,8 @@ class ScmGit implements Serializable {
     this.mainRepoUrl = mainRepoUrl
   }
 
+  // TODO race condition if branch changes; use checkout.GIT_COMMIT (available after Jenkins 2.6)
+  // See https://zanata.atlassian.net/browse/ZNTA-2237
   // getGitCommitId: get the commit Id of the tip of branch
   //   branch: The branch of interested
   //   repoUrl: Specify this if you are interested in other branch

@@ -17,6 +17,7 @@ class Reporting implements Serializable {
         credentialsId: 'codecov_zanata-platform',
         variable: 'CODECOV_TOKEN']]) {
         // NB the codecov script uses CODECOV_TOKEN
+        // TODO use checkout.GIT_COMMIT after Jenkins 2.6 (https://zanata.atlassian.net/browse/ZNTA-2237)
         steps.sh "curl -s https://codecov.io/bash | bash -s - -K -B ${env.BRANCH_NAME} -C ${sha} -P ${env.CHANGE_ID} -b ${env.BUILD_NUMBER}"
       }
     } catch (InterruptedException e) {
