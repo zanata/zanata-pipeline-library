@@ -18,18 +18,32 @@ class ScmGit implements Serializable {
   //   repoUrl: Specify this if you are interested in other branch
   //            (Such as pipeline-library)
   public String getCommitId(String branch, String repoUrl = mainRepoUrl) {
-    String refString = null
     if ( branch ==~ /PR-.*/ ) {
       // Pull request does not show real branch name
-      refString = "refs/pull/" + env.CHANGE_ID + "/head"
+      String line = steps.sh([
+        returnStdout: true,
+        script: "git ls-remote " + repoUrl + " " + "refs/pull/" + env.CHANGE_ID + "/head"
+        ])
+      return line.split()[0]
     } else {
-      refString = "refs/heads/" + branch
+      // It can either be tag or branch
+      String resultBuf = steps.sh([
+        returnStdout: true,
+        script: "git ls-remote --heads --tags " + repoUrl
+        ])
+      String[] lines = resultBuf.split('\n')
+      for(int i=0; i<lines.length; i++){
+        String[] tokens = lines[i].split()
+        if (tokens[1] == 'refs/tags/' + branch) {
+          // tag
+          return tokens[0]
+        } else if (tokens[1] == 'refs/heads/' + branch) {
+          // branch
+          return tokens[0]
+        }
+      }
     }
-    String commitLine = steps.sh([
-      returnStdout: true,
-      script: "git ls-remote " + repoUrl + " " + refString,
-      ])
-      return commitLine.split()[0]
+    return null
   }
 }
 
