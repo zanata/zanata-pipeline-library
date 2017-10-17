@@ -7,18 +7,31 @@ import com.cloudbees.groovy.cps.NonCPS
 class Reporting implements Serializable {
 
   // Send test coverage data to codecov.io
-  @NonCPS
-  static void codecov(def env, def steps, String repoUrl){
+  // @NonCPS
+  static void codecov(def env, def steps, String repoUrl, String credentialId = null){
+    steps.echo "Entering codecov"
     ScmGit scmGit = new ScmGit(env, steps, repoUrl)
     String sha = scmGit.getCommitId(env.BRANCH_NAME)
+    steps.echo "sha: " . sha
+    String branch = scmGit.getBranch(sha)
+    steps.echo "branch: " . branch
+    credentialId = credentialId ?: 'codecov_' + repoUrl.replace(/^.*\//, '')
+    steps.echo "credentialId: $credentialId"
+
     try {
       withCredentials(
         [[$class: 'StringBinding',
-        credentialsId: 'codecov_zanata-platform',
+        credentialsId: credentialId,
         variable: 'CODECOV_TOKEN']]) {
         // NB the codecov script uses CODECOV_TOKEN
         // TODO use checkout.GIT_COMMIT with Jenkins 2.x (https://zanata.atlassian.net/browse/ZNTA-2237)
-        steps.sh "curl -s https://codecov.io/bash | bash -s - -K -B ${env.BRANCH_NAME} -C ${sha} -P ${env.CHANGE_ID} -b ${env.BUILD_NUMBER}"
+        def codecovCmd = "curl -s https://codecov.io/bash | bash -s - -K -b ${env.BUILD_NUMBER} -B $branch -C $sha"
+        if (env.CHANGE_ID){
+          codecovCmd += " -P ${env.CHANGE_ID}"
+        }
+
+        steps.echo codecovCmd
+        steps.sh codecovCmd
       }
     } catch (InterruptedException e) {
       throw e
