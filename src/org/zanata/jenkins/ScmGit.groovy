@@ -46,9 +46,10 @@ class ScmGit implements Serializable {
     return null
   }
 
+  // Note: this method may be expensive, because it calls git ls-remote and iterates through all pull request heads
   // Get pull request id given commitId
   // Returns 0 when nothing commitId is not the tip of any pull request
-  public int getPullId(String commitId, String repoUrl = mainRepoUrl) {
+  public Integer getPullId(String commitId, String repoUrl = mainRepoUrl) {
     String resultBuf = steps.sh([
       returnStdout: true,
       script: "git ls-remote  " + repoUrl
@@ -64,7 +65,7 @@ class ScmGit implements Serializable {
         }
       }
     }
-    return 0
+    return null
   }
 }
 

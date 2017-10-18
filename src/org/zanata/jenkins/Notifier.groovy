@@ -36,10 +36,10 @@ class Notifier implements Serializable {
         pipelineLibraryCommitId = scmGit.getCommitId(pipelineLibraryBranch, libraryRepoUrl)
         steps.echo "pipelineLibraryCommitId: " + pipelineLibraryCommitId
 
-        // Notify pipeline library scm when in pull request
-        int pullId=scmGit.getPullId(pipelineLibraryCommitId, libraryRepoUrl)
+        // Notify pipeline library scm if using library feature branch
+        Integer pullId=scmGit.getPullId(pipelineLibraryCommitId, libraryRepoUrl)
         steps.echo "pipelineLibrary pullId: " + pullId
-        if ( pullId > 0 ) {
+        if ( pullId != null ) {
             // pipeline-library is in pull request
             notifyPipelineLibraryScm = true
         }
