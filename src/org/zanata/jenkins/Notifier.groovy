@@ -1,5 +1,4 @@
 package org.zanata.jenkins
-import org.zanata.jenkins.ScmGit
 
 class Notifier implements Serializable {
     private def build
@@ -37,9 +36,9 @@ class Notifier implements Serializable {
         steps.echo "pipelineLibraryCommitId: " + pipelineLibraryCommitId
 
         // Notify pipeline library scm if using library feature branch
-        Integer pullId=scmGit.getPullId(pipelineLibraryCommitId, libraryRepoUrl)
-        steps.echo "pipelineLibrary pullId: " + pullId
-        if ( pullId != null ) {
+        Integer pipelinePRNum = scmGit.getPullRequestNum(pipelineLibraryCommitId, libraryRepoUrl)
+        if (pipelinePRNum) {
+            steps.echo "pipelineLibrary PR num: " + pipelinePRNum
             // pipeline-library is in pull request
             notifyPipelineLibraryScm = true
         }
