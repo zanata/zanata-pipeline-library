@@ -45,5 +45,26 @@ class ScmGit implements Serializable {
     }
     return null
   }
+
+  // Get pull request id given commitId
+  // Returns 0 when nothing commitId is not the tip of any pull request
+  public int getPullId(String commitId, String repoUrl = mainRepoUrl) {
+    String resultBuf = steps.sh([
+      returnStdout: true,
+      script: "git ls-remote  " + repoUrl
+    ])
+    String[] lines = resultBuf.split('\n')
+    for(int i=0; i<lines.length; i++){
+      String[] tokens = lines[i].split()
+      if (tokens[0] == commitId) {
+        // format to search is refs/pull/<pullId>/head
+        String[] elem=tokens[1].split('/')
+        if ( elem[1] == 'pull' ){
+          return elem[2].toInteger()
+        }
+      }
+    }
+    return 0
+  }
 }
 
