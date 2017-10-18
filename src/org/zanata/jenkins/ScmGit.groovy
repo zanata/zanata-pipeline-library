@@ -55,13 +55,10 @@ class ScmGit implements Serializable {
     ])
     String[] lines = resultBuf.split('\n')
     for(int i=0; i<lines.length; i++){
-      steps.echo "lines[ " + i + "]" + lines[i]
       String[] tokens = lines[i].split()
       if (tokens[0] == commitId) {
         // format to search is refs/pull/<pullId>/head
-        steps.echo "tokens[1]: " + tokens[1]
         String[] elem=tokens[1].split('/')
-        steps.echo "elem[1]: " + elem[1]
         if ( elem[1] == 'pull' ){
           return elem[2].toInteger()
         }
