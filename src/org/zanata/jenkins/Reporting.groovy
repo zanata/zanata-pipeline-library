@@ -11,6 +11,7 @@ class Reporting implements Serializable {
   static void codecov(def env, def steps, String repoUrl){
     ScmGit scmGit = new ScmGit(env, steps, repoUrl)
     String sha = scmGit.getCommitId(env.BRANCH_NAME)
+
     try {
       withCredentials(
         [[$class: 'StringBinding',
@@ -18,7 +19,9 @@ class Reporting implements Serializable {
         variable: 'CODECOV_TOKEN']]) {
         // NB the codecov script uses CODECOV_TOKEN
         // TODO use checkout.GIT_COMMIT with Jenkins 2.x (https://zanata.atlassian.net/browse/ZNTA-2237)
-        steps.sh "curl -s https://codecov.io/bash | bash -s - -K -B ${env.BRANCH_NAME} -C ${sha} -P ${env.CHANGE_ID} -b ${env.BUILD_NUMBER}"
+        def codecovCmd = "curl -s https://codecov.io/bash | bash -s - -K -B ${env.BRANCH_NAME} -C ${sha} -b ${env.BUILD_NUMBER}"
+        steps.echo codecovCmd
+        steps.sh codecovCmd
       }
     } catch (InterruptedException e) {
       throw e
