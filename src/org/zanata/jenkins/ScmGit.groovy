@@ -15,7 +15,7 @@ class ScmGit implements Serializable {
   }
 
   @PackageScope
-  String[] loadGitLsRemoteLines(String repoUrl = mainRepoUrl, String globPattern = null){
+  String[] loadGitLsRemoteLines(String repoUrl = mainRepoUrl, String globPattern = ''){
     // Always return new git ls-remote result if it is not main repo
     return steps.sh([
       returnStdout: true,
