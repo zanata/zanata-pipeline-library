@@ -1,4 +1,5 @@
 package org.zanata.jenkins
+// This class use git ls-remote, thus no need to clone the repository
 
 import groovy.transform.PackageScope
 
@@ -13,6 +14,16 @@ class ScmGit implements Serializable {
     this.mainRepoUrl = mainRepoUrl
   }
 
+  @PackageScope
+  String[] loadGitLsRemoteLines(String repoUrl = mainRepoUrl, String globPattern = null){
+    // Always return new git ls-remote result if it is not main repo
+    return steps.sh([
+      returnStdout: true,
+      script: "git ls-remote  " + repoUrl + " " + globPattern
+      ]).split('\n')
+  }
+
+
   // TODO race condition if branch changes; use checkout.GIT_COMMIT (available after Jenkins 2.6)
   // See https://zanata.atlassian.net/browse/ZNTA-2237
   // getGitCommitId: get the commit Id of the tip of branch
@@ -20,29 +31,18 @@ class ScmGit implements Serializable {
   //   repoUrl: Specify this if you are interested in other branch
   //            (Such as pipeline-library)
   String getCommitId(String branch, String repoUrl = mainRepoUrl) {
+    String[] gitLsRemoteLines
     if ( branch ==~ /PR-.*/ ) {
       // Pull request does not show real branch name
-      String line = steps.sh([
-        returnStdout: true,
-        script: "git ls-remote " + repoUrl + " " + "refs/pull/" + env.CHANGE_ID + "/head"
-        ])
-      return line.split()[0]
+      gitLsRemoteLines = loadGitLsRemoteLines(repoUrl, "refs/pull/" + env.CHANGE_ID + "/head")
+      if (gitLsRemoteLines) {
+        return gitLsRemoteLines[0].split()[0]
+      }
     } else {
       // It can either be tag or branch
-      String resultBuf = steps.sh([
-        returnStdout: true,
-        script: "git ls-remote --heads --tags " + repoUrl
-        ])
-      String[] lines = resultBuf.split('\n')
-      for(int i=0; i<lines.length; i++){
-        String[] tokens = lines[i].split()
-        if (tokens[1] == 'refs/tags/' + branch) {
-          // tag
-          return tokens[0]
-        } else if (tokens[1] == 'refs/heads/' + branch) {
-          // branch
-          return tokens[0]
-        }
+      gitLsRemoteLines = loadGitLsRemoteLines(repoUrl, "refs/*/" + branch )
+      if (gitLsRemoteLines) {
+        return gitLsRemoteLines[0].split()[0]
       }
     }
     return null
@@ -50,24 +50,34 @@ class ScmGit implements Serializable {
 
   // Note: this method may be expensive, because it calls git ls-remote and iterates through all pull request heads
   // Get pull request id given commitId
-  // Returns 0 when nothing commitId is not the tip of any pull request
+  // Returns null when nothing commitId is not the tip of any pull request
   // If this needs to become public, please move it to PullRequests.groovy
   @PackageScope
   Integer getPullRequestNum(String commitId, String repoUrl = mainRepoUrl) {
-    String resultBuf = steps.sh([
-        returnStdout: true,
-        script: "git ls-remote  " + repoUrl
-    ])
-    String[] lines = resultBuf.split('\n')
-    for (int i = 0; i < lines.length; i++) {
+    String[] gitLsRemoteLines = loadGitLsRemoteLines(repoUrl, "refs/pull/*/head")
+    for (int i = 0; i < gitLsRemoteLines.length; i++) {
       // split each line by whitespace
-      String[] tokens = lines[i].split()
+      String[] tokens = gitLsRemoteLines[i].split()
       if (tokens[0] == commitId) {
         // format to search is refs/pull/<pullId>/head
-        String[] elem = tokens[1].split('/')
-        if (elem[1] == 'pull') {
-          return elem[2].toInteger()
-        }
+        return tokens[1].split('/')[2].toInteger()
+      }
+    }
+    return null
+  }
+
+  // Get branch name, given commitId
+  // Returns null when nothing commitId is not the tip of any branch
+  // Note: this method may be expensive, because it calls git ls-remote and iterates through all heads
+  @PackageScope
+  String getBranch(String commitId, String repoUrl = mainRepoUrl) {
+    String[] gitLsRemoteLines = loadGitLsRemoteLines(repoUrl, "refs/heads/*")
+    for (int i = 0; i < gitLsRemoteLines.length; i++) {
+      // split each line by whitespace
+      String[] tokens = gitLsRemoteLines[i].split()
+      if (tokens[0] == commitId) {
+        // format to search is refs/heads/<branch>
+        return tokens[1].split('/')[3]
       }
     }
     return null
