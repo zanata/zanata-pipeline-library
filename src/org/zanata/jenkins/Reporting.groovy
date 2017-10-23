@@ -8,14 +8,11 @@ class Reporting implements Serializable {
 
   // Send test coverage data to codecov.io
   // @NonCPS
-  static void codecov(def env, def steps, String repoUrl, String credentialId = null){
+  static void codecov(def env, def steps, def scmGit, String credentialId = null){
     steps.echo "Entering codecov"
-    ScmGit scmGit = new ScmGit(env, steps, repoUrl)
-    String sha = scmGit.getCommitId(env.BRANCH_NAME)
-    steps.echo "sha: " . sha
+    String sha = scmGit.getCommitId()
     String branch = scmGit.getBranch(sha)
-    steps.echo "branch: " . branch
-    credentialId = credentialId ?: 'codecov_' + repoUrl.replace(/^.*\//, '')
+    credentialId = credentialId ?: 'codecov_' + scmGit.getRepoUrl().replace(/^.*\//, '')
     steps.echo "credentialId: $credentialId"
 
     try {

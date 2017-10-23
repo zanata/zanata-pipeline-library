@@ -6,37 +6,33 @@ class Notifier implements Serializable {
     private def steps
     private def repoUrl
     private def jobContext
-    private ScmGit scmGit
+    private def scmGit
+    private def pipelineLibraryScmGit
     private String pipelineLibraryBranch
     // Whether to update commit status of pipeline-library
     private boolean notifyPipelineLibraryScm = false
     // Whether to update commit status of the main repo (the repo that call the pipelinie-library)
-    // Commit Id of zanata-pipeline-library
-    private String pipelineLibraryCommitId = null
     // Commit Id of main repo
     private String currentCommitId = null
     private String durationStr = null
     private static final String libraryRepoUrl = "https://github.com/zanata/zanata-pipeline-library.git"
 
-    Notifier(env, steps, build = null, repoUrl = null, jobContext = env.JOB_NAME, String pipelineLibraryBranch = 'master' ) {
+    Notifier(env, steps, build = null, pipelineLibraryScmGit, jobContext = env.JOB_NAME ) {
         this.build = build
         this.env = env
-        this.pipelineLibraryBranch = pipelineLibraryBranch
         this.steps = steps
-        this.repoUrl = repoUrl
         this.jobContext = jobContext
-        scmGit = new ScmGit(env, steps, repoUrl)
+        this.pipelineLibraryScmGit = pipelineLibraryScmGit
     }
 
     void started() {
         sendHipChat color: "GRAY", notify: true, message: "STARTED: Job " + jobLinkHtml()
 
         // Determine whether pipeline-library need to be informed
-        pipelineLibraryCommitId = scmGit.getCommitId(pipelineLibraryBranch, libraryRepoUrl)
-        steps.echo "pipelineLibraryCommitId: " + pipelineLibraryCommitId
+        steps.echo "pipelineLibrary commitId: " + pipelineLibraryScmGit.getCommitId()
 
         // Notify pipeline library scm if using library feature branch
-        Integer pipelinePRNum = scmGit.getPullRequestNum(pipelineLibraryCommitId, libraryRepoUrl)
+        Integer pipelinePRNum = pipelineLibraryScmGit.getPullRequestNum()
         if (pipelinePRNum) {
             steps.echo "pipelineLibrary PR num: " + pipelinePRNum
             // pipeline-library is in pull request
@@ -45,7 +41,7 @@ class Notifier implements Serializable {
         updateGitHubCommitStatus('PENDING', 'STARTED')
     }
 
-    void startBuilding() {
+    void startBuilding(def scmGit) {
         // Git References
         currentCommitId = scmGit.getCommitId(env.BRANCH_NAME)
         steps.echo "currentCommitId: " + currentCommitId
@@ -142,8 +138,8 @@ class Notifier implements Serializable {
             steps.step([
                 $class: 'GitHubCommitStatusSetter',
                 // Use properties GithubProjectProperty
-                reposSource: [$class: "ManuallyEnteredRepositorySource", url: libraryRepoUrl ],
-                commitShaSource: [$class: "ManuallyEnteredShaSource", sha: pipelineLibraryCommitId ],
+                reposSource: [$class: "ManuallyEnteredRepositorySource", url: pipelineLibraryScmGit.getRepoUrl() ],
+                commitShaSource: [$class: "ManuallyEnteredShaSource", sha: pipelineLibraryScmGit.getCommitId() ],
                 contextSource: [$class: 'ManuallyEnteredCommitContextSource', context: env.JOB_NAME ],
                 errorHandlers: [[$class: 'ShallowAnyErrorHandler']],
                 statusResultSource: [
@@ -155,13 +151,13 @@ class Notifier implements Serializable {
             ])
         }
 
-        // COMMIT_ID is null before checkout scm
-        if (currentCommitId != null){
+        // scmGit is null before checkout scm
+        if (scmGit){
             steps.step([
                 $class: 'GitHubCommitStatusSetter',
                 // Use properties GithubProjectProperty
-                reposSource: [$class: "ManuallyEnteredRepositorySource", url: repoUrl ],
-                commitShaSource: [$class: "ManuallyEnteredShaSource", sha: currentCommitId ],
+                reposSource: [$class: "ManuallyEnteredRepositorySource", url: scmGit.getRepoUrl() ],
+                commitShaSource: [$class: "ManuallyEnteredShaSource", sha: scmGit.getCommitId() ],
                 contextSource: [$class: 'ManuallyEnteredCommitContextSource', context: ctx],
                 errorHandlers: [[$class: 'ShallowAnyErrorHandler']],
                 statusResultSource: [
