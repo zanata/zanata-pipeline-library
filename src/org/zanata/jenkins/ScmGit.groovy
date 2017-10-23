@@ -27,7 +27,7 @@ class ScmGit implements Serializable {
       // Pull request does not show real branchTagPull name
       gitLsRemoteLines = steps.sh([
         returnStdout: true,
-        script: "git ls-remote $repoUrl refs/pull/$pullRequestNum/head",
+        script: "git ls-remote $repoUrl refs/pull/${pullRequestNum}/head",
         ]).split('\n')
       if (gitLsRemoteLines) {
         this.commitId = gitLsRemoteLines[0].split()[0]
@@ -36,31 +36,32 @@ class ScmGit implements Serializable {
       // It can either be tag or branch
       gitLsRemoteLines = steps.sh([
         returnStdout: true,
-        script: "git ls-remote $repoUrl refs/*/$branchTagPull",
+        script: "git ls-remote $repoUrl refs/*/${branchTagPull}",
         ]).split('\n')
       if (gitLsRemoteLines) {
         this.commitId = gitLsRemoteLines[0].split()[0]
       }
     }
     assert commitId != null
-
-    // Find branch
     gitLsRemoteLines = steps.sh([
       returnStdout: true,
-      script: "git ls-remote $repoUrl refs/head/*",
+      script: "git ls-remote $repoUrl refs/heads/*",
       ]).split('\n')
+
+    this.branch = this.parseBranch(this.commitId, gitLsRemoteLines)
+  }
+
+  @PackageScope
+  static String parseBranch(String commitId, String[] gitLsRemoteLines) {
     for (int i = 0; i < gitLsRemoteLines.length; i++) {
       // split each line by whitespace
       String[] tokens = gitLsRemoteLines[i].split()
       if (tokens[0] == commitId) {
-        String[] refElems = tokens[1].split('/')[3]
         // format to search is refs/heads/<branch>
-        if (refElems[1] == 'head'){
-           this.branch = refElems[2]
-        }
-        // We don't deem tags as branches
+        return tokens[1].split('/')[3]
       }
     }
+    return null
   }
 
   // getGitCommitId: get the commit Id of the tip of branch

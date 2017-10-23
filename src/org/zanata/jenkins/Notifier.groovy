@@ -6,8 +6,8 @@ class Notifier implements Serializable {
     private def steps
     private def repoUrl
     private def jobContext
-    private def scmGit
     private def pipelineLibraryScmGit
+    private def mainScmGit
     private String pipelineLibraryBranch
     // Whether to update commit status of pipeline-library
     private boolean notifyPipelineLibraryScm = false
@@ -17,12 +17,13 @@ class Notifier implements Serializable {
     private String durationStr = null
     private static final String libraryRepoUrl = "https://github.com/zanata/zanata-pipeline-library.git"
 
-    Notifier(env, steps, build = null, pipelineLibraryScmGit, jobContext = env.JOB_NAME ) {
+    Notifier(env, steps, build = null, pipelineLibraryScmGit, mainScmGit, jobContext = env.JOB_NAME ) {
         this.build = build
         this.env = env
         this.steps = steps
         this.jobContext = jobContext
         this.pipelineLibraryScmGit = pipelineLibraryScmGit
+        this.mainScmGit = mainScmGit
     }
 
     void started() {
@@ -41,9 +42,9 @@ class Notifier implements Serializable {
         updateGitHubCommitStatus('PENDING', 'STARTED')
     }
 
-    void startBuilding(def scmGit) {
+    void startBuilding() {
         // Git References
-        currentCommitId = scmGit.getCommitId(env.BRANCH_NAME)
+        currentCommitId = mainScmGit.getCommitId(env.BRANCH_NAME)
         steps.echo "currentCommitId: " + currentCommitId
         sendHipChat color: "GRAY", notify: true, message: "BUILDING: Job " + jobLinkHtml()
         updateGitHubCommitStatus('PENDING', 'BUILDING')
@@ -151,13 +152,13 @@ class Notifier implements Serializable {
             ])
         }
 
-        // scmGit is null before checkout scm
-        if (scmGit){
+        // mainScmGit is null before checkout scm
+        if (mainScmGit){
             steps.step([
                 $class: 'GitHubCommitStatusSetter',
                 // Use properties GithubProjectProperty
-                reposSource: [$class: "ManuallyEnteredRepositorySource", url: scmGit.getRepoUrl() ],
-                commitShaSource: [$class: "ManuallyEnteredShaSource", sha: scmGit.getCommitId() ],
+                reposSource: [$class: "ManuallyEnteredRepositorySource", url: mainScmGit.getRepoUrl() ],
+                commitShaSource: [$class: "ManuallyEnteredShaSource", sha: mainScmGit.getCommitId() ],
                 contextSource: [$class: 'ManuallyEnteredCommitContextSource', context: ctx],
                 errorHandlers: [[$class: 'ShallowAnyErrorHandler']],
                 statusResultSource: [
