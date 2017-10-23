@@ -1,7 +1,7 @@
 package org.zanata.jenkins
 // This class use git ls-remote, thus no need to clone the repository
+// TODO race condition if branch changes; use checkout.GIT_COMMIT (available after Jenkins 2.6)
 
-import com.cloudbees.groovy.cps.NonCPS
 import groovy.transform.PackageScope
 
 class ScmGit implements Serializable {
@@ -15,15 +15,19 @@ class ScmGit implements Serializable {
   private String[] headsGitLsRemoteLines
 
   // Note: this method may be expensive, because it calls git ls-remote and iterates through all pull request heads
-  ScmGit(env, steps, repoUrl, String branchTagPull = 'master') {
+  ScmGit(env, steps, repoUrl) {
     this.env = env
     this.steps = steps
     this.repoUrl = repoUrl
+  }
+
+  // This cannot in constructor because https://issues.jenkins-ci.org/browse/JENKINS-26313
+  //  Workflow script fails if CPS-transformed methods are called from constructors
+  void init(String branchTagPull = 'master'){
     String[] gitLsRemoteLines
 
-    // TODO race condition if branch changes; use checkout.GIT_COMMIT (available after Jenkins 2.6)
     if ( branchTagPull ==~ /PR-.*/ ) {
-      this.pullRequestNum = branchPullTag.replace(/PR-/, '').toInteger()
+      this.pullRequestNum = branchTagPull.replace(/PR-/, '') as Integer
       // Pull request does not show real branchTagPull name
       gitLsRemoteLines = steps.sh([
         returnStdout: true,
@@ -38,9 +42,9 @@ class ScmGit implements Serializable {
         returnStdout: true,
         script: "git ls-remote $repoUrl refs/*/${branchTagPull}",
         ]).split('\n')
-      if (gitLsRemoteLines) {
-        this.commitId = gitLsRemoteLines[0].split()[0]
-      }
+        if (gitLsRemoteLines) {
+          this.commitId = gitLsRemoteLines[0].split()[0]
+        }
     }
     assert commitId != null
     gitLsRemoteLines = steps.sh([
@@ -48,7 +52,7 @@ class ScmGit implements Serializable {
       script: "git ls-remote $repoUrl refs/heads/*",
       ]).split('\n')
 
-    this.branch = this.parseBranch(this.commitId, gitLsRemoteLines)
+    this.branch = parseBranch(this.commitId, gitLsRemoteLines)
   }
 
   @PackageScope
@@ -58,7 +62,7 @@ class ScmGit implements Serializable {
       String[] tokens = gitLsRemoteLines[i].split()
       if (tokens[0] == commitId) {
         // format to search is refs/heads/<branch>
-        return tokens[1].split('/')[3]
+        return tokens[1].split('/')[2]
       }
     }
     return null

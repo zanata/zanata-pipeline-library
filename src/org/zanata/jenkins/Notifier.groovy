@@ -44,7 +44,7 @@ class Notifier implements Serializable {
 
     void startBuilding() {
         // Git References
-        currentCommitId = mainScmGit.getCommitId(env.BRANCH_NAME)
+        currentCommitId = mainScmGit.getCommitId()
         steps.echo "currentCommitId: " + currentCommitId
         sendHipChat color: "GRAY", notify: true, message: "BUILDING: Job " + jobLinkHtml()
         updateGitHubCommitStatus('PENDING', 'BUILDING')
