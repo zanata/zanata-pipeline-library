@@ -1,12 +1,13 @@
 package org.zanata.jenkins
 // This class use git ls-remote, thus no need to clone the repository
 
+import com.cloudbees.groovy.cps.NonCPS
 import groovy.transform.PackageScope
 
 class ScmGit implements Serializable {
   private def env
   private def steps
-  private def mainRepoUrl
+  private def repoUrl
   private String commitId
   private Integer pullRequestNum
   private String branch
@@ -14,68 +15,59 @@ class ScmGit implements Serializable {
   private String[] headsGitLsRemoteLines
 
   // Note: this method may be expensive, because it calls git ls-remote and iterates through all pull request heads
-  ScmGit(env, steps, mainRepoUrl, String branchTagPull = 'master') {
+  ScmGit(env, steps, repoUrl, String branchTagPull = 'master') {
     this.env = env
     this.steps = steps
-    this.mainRepoUrl = mainRepoUrl
-
-    this.commitId = parseCommitId(steps, branchTagPull, mainRepoUrl)
-    this.branch = parseCommitId(steps, this.commitId, mainRepoUrl)
-
-    if (branchTagPull ==~ /PR-.*/){
-      this.pullRequestNum = branchPullTag.replace(/PR-/, '').toInteger()
-    }
-  }
-
-  @PackageScope
-  String[] loadGitLsRemoteLines(def steps, String repoUrl, String options = '', String globPattern = ''){
-    // Always return new git ls-remote result if it is not main repo
-    return steps.sh([
-      returnStdout: true,
-      script: "git ls-remote $options $repoUrl $globPattern",
-      ]).split('\n')
-  }
-
-  // TODO race condition if branch changes; use checkout.GIT_COMMIT (available after Jenkins 2.6)
-  // See https://zanata.atlassian.net/browse/ZNTA-2237
-  static String parseCommitId(def steps, String branchTagPull, String repoUrl) {
+    this.repoUrl = repoUrl
     String[] gitLsRemoteLines
+
+    // TODO race condition if branch changes; use checkout.GIT_COMMIT (available after Jenkins 2.6)
     if ( branchTagPull ==~ /PR-.*/ ) {
+      this.pullRequestNum = branchPullTag.replace(/PR-/, '').toInteger()
       // Pull request does not show real branchTagPull name
-      gitLsRemoteLines = loadGitLsRemoteLines(steps, repoUrl, "refs/pull/" + branchTagPull.replace(/PR-/, '') + "/head")
+      gitLsRemoteLines = steps.sh([
+        returnStdout: true,
+        script: "git ls-remote $repoUrl refs/pull/$pullRequestNum/head",
+        ]).split('\n')
       if (gitLsRemoteLines) {
-        return gitLsRemoteLines[0].split()[0]
+        this.commitId = gitLsRemoteLines[0].split()[0]
       }
     } else {
       // It can either be tag or branch
-      gitLsRemoteLines = loadGitLsRemoteLines(steps, repoUrl, "refs/*/" + branchTagPull )
+      gitLsRemoteLines = steps.sh([
+        returnStdout: true,
+        script: "git ls-remote $repoUrl refs/*/$branchTagPull",
+        ]).split('\n')
       if (gitLsRemoteLines) {
-        return gitLsRemoteLines[0].split()[0]
+        this.commitId = gitLsRemoteLines[0].split()[0]
       }
     }
-    return null
-  }
+    assert commitId != null
 
-  static String parseBranch(def steps, String commitId, String repoUrl) {
-    String[] gitLsRemoteLines = loadGitLsRemoteLines(steps, repoUrl, "refs/heads/*")
+    // Find branch
+    gitLsRemoteLines = steps.sh([
+      returnStdout: true,
+      script: "git ls-remote $repoUrl refs/head/*",
+      ]).split('\n')
     for (int i = 0; i < gitLsRemoteLines.length; i++) {
       // split each line by whitespace
       String[] tokens = gitLsRemoteLines[i].split()
       if (tokens[0] == commitId) {
+        String[] refElems = tokens[1].split('/')[3]
         // format to search is refs/heads/<branch>
-        return tokens[1].split('/')[3]
+        if (refElems[1] == 'head'){
+           this.branch = refElems[2]
+        }
+        // We don't deem tags as branches
       }
     }
-    return null
   }
 
   // getGitCommitId: get the commit Id of the tip of branch
   //   branch: The branch of interested
   //   repoUrl: Specify this if you are interested in other branch
   //            (Such as pipeline-library)
-  String getCommitId(String branch = this.branch, String repoUrl = mainRepoUrl) {
-    if (repoUrl != mainRepoUrl)
-      return parseCommitId(steps, branch, repoUrl)
+  String getCommitId() {
     return commitId
   }
 
@@ -90,16 +82,14 @@ class ScmGit implements Serializable {
 
   @PackageScope
   String getRepoUrl() {
-    return getRepoUrl
+    return repoUrl
   }
 
-  // Get branch name, given commitId
+  // Get branch name
   // Returns null when nothing commitId is not the tip of any branch
   // Note: this method may be expensive, because it calls git ls-remote and iterates through all heads
   @PackageScope
-  String getBranch(String commitId = this.commitId, String repoUrl = mainRepoUrl) {
-    if (repoUrl != mainRepoUrl || commitId != this.commitId )
-      return parseBranch(steps, commitId, repoUrl)
+  String getBranch() {
     return branch
   }
 }
