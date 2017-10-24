@@ -113,7 +113,11 @@ class Notifier implements Serializable {
             steps.echo '[WARN] build is null, skipping the finish() method'
             return
         }
-        if (( build.result ?: 'SUCCESS') == 'SUCCESS' ) {
+        // No news is good news, so set it as 'SUCCESS'
+        // Otherwise, sendEmail mistakenly sends 'FAILURE'
+        build.result = build.result ?: 'SUCCESS'
+        if ( build.result  == 'SUCCESS' ) {
+            build.result = 'SUCCESS'
             successful(message);
         } else if ( build.result ==  'UNSTABLE' ) {
             failed(message);
@@ -174,15 +178,15 @@ class Notifier implements Serializable {
     // Build success without failed tests
     void successful(String message='') {
         sendHipChat color: "GRAY", notify: true, message: "SUCCESSFUL: Job " + jobLinkHtml()
-            updateGitHubCommitStatus('SUCCESS', message)
-            sendEmail(message)
+        updateGitHubCommitStatus('SUCCESS', message)
+        sendEmail(message)
     }
 
     // Used when tests failure, but compile completed
     void failed(String message='') {
         sendHipChat color: "RED", notify: true, message: "FAILED: Job " + jobLinkHtml()
-            updateGitHubCommitStatus('FAILURE', message)
-            sendEmail(message)
+        updateGitHubCommitStatus('FAILURE', message)
+        sendEmail(message)
     }
 
     // Used when build failure. e.g. build system/script failed, or compile error
@@ -196,18 +200,18 @@ class Notifier implements Serializable {
 
     private void sendEmail(String message='') {
         assert build != null : 'Notifier.build is null'
-            def changes = ""
+        def changes = ""
 
-            // build.changeSets might be null in TestJenkinsfile
-            if (build.changeSets != null ){
-                for(Iterator changeSetIter=build.changeSets.iterator(); changeSetIter.hasNext(); ){
-                    def set=changeSetIter.next();
-                    for(Iterator entryIter=set.iterator(); entryIter.hasNext(); ){
-                        def entry=entryIter.next()
-                        changes += "Commit ${entry.commitId} by ${entry.author.id} (${entry.author.fullName})\n"
-                    }
+        // build.changeSets might be null in TestJenkinsfile
+        if (build.changeSets != null) {
+            for(Iterator changeSetIter=build.changeSets.iterator(); changeSetIter.hasNext(); ){
+                def set=changeSetIter.next()
+                for(Iterator entryIter=set.iterator(); entryIter.hasNext();) {
+                    def entry=entryIter.next()
+                    changes += "Commit ${entry.commitId} by ${entry.author.id} (${entry.author.fullName})\n"
                 }
             }
+        }
         steps.emailext([
             subject: "${env.JOB_NAME} - Build #${build.id} - ${build.result?:'FAILURE'}: ${message}",
             body:  "url: ${build.absoluteUrl}\n" +
