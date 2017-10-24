@@ -27,7 +27,8 @@ class ScmGit implements Serializable {
     String[] gitLsRemoteLines
 
     if ( branchTagPull ==~ /PR-.*/ ) {
-      this.pullRequestNum = branchTagPull.replace(/PR-/, '') as Integer
+      this.pullRequestNum = branchTagPull.replaceFirst(/PR-/, '') as Integer
+      assert pullRequestNum != null
       // Pull request does not show real branchTagPull name
       gitLsRemoteLines = steps.sh([
         returnStdout: true,

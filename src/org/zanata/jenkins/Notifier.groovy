@@ -133,11 +133,6 @@ class Notifier implements Serializable {
         def ctx = overrideContext ?: jobContext
         String outputStr = state + ': ' + message + ( durationStr ? " Duration: " + durationStr : '')
 
-        if (repoUrl == null) {
-            steps.echo '[WARN] repoUrl is null; skipping GitHub Status'
-            return
-        }
-
         if (notifyPipelineLibraryScm) {
             // Set the status for zanata-pipeline-library
             steps.step([
