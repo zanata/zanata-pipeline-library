@@ -23,39 +23,69 @@ class ScmGit implements Serializable {
 
   // This cannot in constructor because https://issues.jenkins-ci.org/browse/JENKINS-26313
   //  Workflow script fails if CPS-transformed methods are called from constructors
-  void init(String branchTagPull = 'master'){
-    String[] gitLsRemoteLines
+  void init(String branchTagPull){
+    String[] headsGitLsRemoteLines = steps.sh([
+      returnStdout: true,
+      script: "git ls-remote $repoUrl  refs/heads/*",
+      ]).split('\n')
+    String[] pullGitLsRemoteLines
 
     if ( branchTagPull ==~ /PR-.*/ ) {
       this.pullRequestNum = branchTagPull.replaceFirst(/PR-/, '') as Integer
-      assert pullRequestNum != null
-      // Pull request does not show real branchTagPull name
-      gitLsRemoteLines = steps.sh([
+      pullGitLsRemoteLines = steps.sh([
         returnStdout: true,
         script: "git ls-remote $repoUrl refs/pull/${pullRequestNum}/head",
         ]).split('\n')
-      if (gitLsRemoteLines) {
-        this.commitId = gitLsRemoteLines[0].split()[0]
+      if (pullGitLsRemoteLines) {
+        this.commitId = parseCommitId(pullRequestNum as String, pullGitLsRemoteLines)
       }
     } else {
       // It can either be tag or branch
-      gitLsRemoteLines = steps.sh([
-        returnStdout: true,
-        script: "git ls-remote $repoUrl refs/*/${branchTagPull}",
-        ]).split('\n')
+      // We look branches (heads) first
+      this.commitId = parseCommitId(branchTagPull, headsGitLsRemoteLines)
+      if (! this.commitId) {
+        // branchTagPull is a tag
+        String[] tagsGitLsRemoteLines = steps.sh([
+          returnStdout: true,
+          script: "git ls-remote $repoUrl refs/tags/${branchTagPull}",
+          ]).split('\n')
         if (gitLsRemoteLines) {
-          this.commitId = gitLsRemoteLines[0].split()[0]
+          this.commitId = parseCommitId(branchTagPull, tagsGitLsRemoteLines)
         }
+      }
     }
     assert commitId != null
-    gitLsRemoteLines = steps.sh([
-      returnStdout: true,
-      script: "git ls-remote $repoUrl refs/heads/*",
-      ]).split('\n')
 
-    this.branch = parseBranch(this.commitId, gitLsRemoteLines)
+    // Find branch
+    this.branch = parseBranch(commitId, headsGitLsRemoteLines)
+
+    // Find PR Num
+    if (!pullGitLsRemoteLines) {
+      pullGitLsRemoteLines = steps.sh([
+        returnStdout: true,
+        script: "git ls-remote $repoUrl refs/pull/*/head",
+        ]).split('\n')
+      this.pullRequestNum  = parseBranch(commitId, pullGitLsRemoteLines) as Integer
+    }
   }
 
+  @PackageScope
+  static String parseCommitId(String branchTagPull, String[] gitLsRemoteLines, String type = null) {
+    for(int i=0; i<gitLsRemoteLines?.length; i++) {
+      String[] tokens = gitLsRemoteLines[i].split()
+      // tokens[1] looks like refs/heads/master
+      String[] refElems = tokens[1].split('/')
+      if (refElems[2] == branchTagPull) {
+        if (type && (refElems[1] != type)){
+          continue
+        }
+        return tokens[0]
+      }
+    }
+    return null
+  }
+
+  // Parse branches, tags, or pull request Id
   @PackageScope
   static String parseBranch(String commitId, String[] gitLsRemoteLines) {
     for (int i = 0; i < gitLsRemoteLines.length; i++) {
