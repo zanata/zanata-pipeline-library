@@ -31,33 +31,31 @@ class ScmGit implements Serializable {
     String[] pullGitLsRemoteLines
 
     if ( branchTagPull ==~ /PR-.*/ ) {
-      this.pullRequestNum = branchTagPull.replaceFirst(/PR-/, '') as Integer
+      pullRequestNum = branchTagPull.replaceFirst(/PR-/, '') as Integer
       pullGitLsRemoteLines = steps.sh([
         returnStdout: true,
         script: "git ls-remote $repoUrl refs/pull/${pullRequestNum}/head",
         ]).split('\n')
-      if (pullGitLsRemoteLines) {
-        this.commitId = parseCommitId(pullRequestNum as String, pullGitLsRemoteLines)
-      }
+      assert pullGitLsRemoteLines
+      commitId = parseCommitId(pullRequestNum as String, pullGitLsRemoteLines)
     } else {
       // It can either be tag or branch
       // We look branches (heads) first
-      this.commitId = parseCommitId(branchTagPull, headsGitLsRemoteLines)
-      if (! this.commitId) {
+      commitId = parseCommitId(branchTagPull, headsGitLsRemoteLines)
+      if (! commitId) {
         // branchTagPull is a tag
         String[] tagsGitLsRemoteLines = steps.sh([
           returnStdout: true,
           script: "git ls-remote $repoUrl refs/tags/${branchTagPull}",
           ]).split('\n')
-        if (gitLsRemoteLines) {
-          this.commitId = parseCommitId(branchTagPull, tagsGitLsRemoteLines)
-        }
+        assert tagsGitLsRemoteLines
+        commitId = parseCommitId(branchTagPull, tagsGitLsRemoteLines)
       }
     }
-    assert commitId != null
+    assert commitId
 
     // Find branch
-    this.branch = parseBranch(commitId, headsGitLsRemoteLines)
+    branch = parseBranch(commitId, headsGitLsRemoteLines)
 
     // Find PR Num
     if (!pullGitLsRemoteLines) {
@@ -65,7 +63,7 @@ class ScmGit implements Serializable {
         returnStdout: true,
         script: "git ls-remote $repoUrl refs/pull/*/head",
         ]).split('\n')
-      this.pullRequestNum  = parseBranch(commitId, pullGitLsRemoteLines) as Integer
+      pullRequestNum  = parseBranch(commitId, pullGitLsRemoteLines) as Integer
     }
   }
 
