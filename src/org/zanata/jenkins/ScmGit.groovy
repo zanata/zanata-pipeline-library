@@ -38,6 +38,9 @@ class ScmGit implements Serializable {
         ]).split('\n')
       assert pullGitLsRemoteLines
       commitId = parseCommitId(pullRequestNum as String, pullGitLsRemoteLines)
+      if (! commitId) {
+        throw new Exception("Unable to find commitId $branchTagPull")
+      }
     } else {
       // It can either be tag or branch
       // We look branches (heads) first
@@ -50,6 +53,9 @@ class ScmGit implements Serializable {
           ]).split('\n')
         assert tagsGitLsRemoteLines
         commitId = parseCommitId(branchTagPull, tagsGitLsRemoteLines)
+        if (! commitId) {
+          throw new Exception("Unable to find commitId $branchTagPull")
+        }
       }
     }
     assert commitId
