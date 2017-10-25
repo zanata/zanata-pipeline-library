@@ -107,17 +107,20 @@ class Notifier implements Serializable {
         return "0s"
     }
 
+    // We have already obtain the job result
+    // If currentBuild.result is null, it will set it as 'SUCCESS'
     void finish(String message = '') {
         durationStr=durationToString()
-        if ( build == null ) {
+        if (build == null) {
             steps.echo '[WARN] build is null, skipping the finish() method'
             return
         }
         // No news is good news, so set it as 'SUCCESS'
         // Otherwise, sendEmail mistakenly sends 'FAILURE'
-        build.result = build.result ?: 'SUCCESS'
+        if (!build.result) {
+          build.result = 'SUCCESS'
+        }
         if ( build.result  == 'SUCCESS' ) {
-            build.result = 'SUCCESS'
             successful(message);
         } else if ( build.result ==  'UNSTABLE' ) {
             failed(message);
