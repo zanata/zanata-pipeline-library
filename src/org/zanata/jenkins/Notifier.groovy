@@ -1,5 +1,4 @@
 package org.zanata.jenkins
-import org.zanata.jenkins.ScmGit
 
 class Notifier implements Serializable {
     private def build
@@ -7,37 +6,36 @@ class Notifier implements Serializable {
     private def steps
     private def repoUrl
     private def jobContext
-    private ScmGit scmGit
+    private def pipelineLibraryScmGit
+    private def mainScmGit
     private String pipelineLibraryBranch
     // Whether to update commit status of pipeline-library
     private boolean notifyPipelineLibraryScm = false
     // Whether to update commit status of the main repo (the repo that call the pipelinie-library)
-    // Commit Id of zanata-pipeline-library
-    private String pipelineLibraryCommitId = null
     // Commit Id of main repo
     private String currentCommitId = null
     private String durationStr = null
     private static final String libraryRepoUrl = "https://github.com/zanata/zanata-pipeline-library.git"
 
-    Notifier(env, steps, build = null, repoUrl = null, jobContext = env.JOB_NAME, String pipelineLibraryBranch = 'master' ) {
+    Notifier(env, steps, build = null, pipelineLibraryScmGit, mainScmGit, jobContext = env.JOB_NAME ) {
         this.build = build
         this.env = env
-        this.pipelineLibraryBranch = pipelineLibraryBranch
         this.steps = steps
-        this.repoUrl = repoUrl
         this.jobContext = jobContext
-        scmGit = new ScmGit(env, steps, repoUrl)
+        this.pipelineLibraryScmGit = pipelineLibraryScmGit
+        this.mainScmGit = mainScmGit
     }
 
     void started() {
         sendHipChat color: "GRAY", notify: true, message: "STARTED: Job " + jobLinkHtml()
 
         // Determine whether pipeline-library need to be informed
-        pipelineLibraryCommitId = scmGit.getCommitId(pipelineLibraryBranch, libraryRepoUrl)
-        steps.echo "pipelineLibraryCommitId: " + pipelineLibraryCommitId
+        steps.echo "pipelineLibrary commitId: " + pipelineLibraryScmGit.getCommitId()
 
-        // Getting pipeline-library master branch
-        if ( pipelineLibraryBranch != 'master' ) {
+        // Notify pipeline library scm if using library feature branch
+        Integer pipelinePRNum = pipelineLibraryScmGit.getPullRequestNum()
+        if (pipelinePRNum) {
+            steps.echo "pipelineLibrary PR num: " + pipelinePRNum
             // pipeline-library is in pull request
             notifyPipelineLibraryScm = true
         }
@@ -46,7 +44,7 @@ class Notifier implements Serializable {
 
     void startBuilding() {
         // Git References
-        currentCommitId = scmGit.getCommitId(env.BRANCH_NAME)
+        currentCommitId = mainScmGit.getCommitId()
         steps.echo "currentCommitId: " + currentCommitId
         sendHipChat color: "GRAY", notify: true, message: "BUILDING: Job " + jobLinkHtml()
         updateGitHubCommitStatus('PENDING', 'BUILDING')
@@ -109,13 +107,20 @@ class Notifier implements Serializable {
         return "0s"
     }
 
+    // We have already obtain the job result
+    // If currentBuild.result is null, it will set it as 'SUCCESS'
     void finish(String message = '') {
         durationStr=durationToString()
-        if ( build == null ) {
+        if (build == null) {
             steps.echo '[WARN] build is null, skipping the finish() method'
             return
         }
-        if (( build.result ?: 'SUCCESS') == 'SUCCESS' ) {
+        // No news is good news, so set it as 'SUCCESS'
+        // Otherwise, sendEmail mistakenly sends 'FAILURE'
+        if (!build.result) {
+          build.result = 'SUCCESS'
+        }
+        if ( build.result  == 'SUCCESS' ) {
             successful(message);
         } else if ( build.result ==  'UNSTABLE' ) {
             failed(message);
@@ -131,18 +136,13 @@ class Notifier implements Serializable {
         def ctx = overrideContext ?: jobContext
         String outputStr = state + ': ' + message + ( durationStr ? " Duration: " + durationStr : '')
 
-        if (repoUrl == null) {
-            steps.echo '[WARN] repoUrl is null; skipping GitHub Status'
-            return
-        }
-
         if (notifyPipelineLibraryScm) {
             // Set the status for zanata-pipeline-library
             steps.step([
                 $class: 'GitHubCommitStatusSetter',
                 // Use properties GithubProjectProperty
-                reposSource: [$class: "ManuallyEnteredRepositorySource", url: libraryRepoUrl ],
-                commitShaSource: [$class: "ManuallyEnteredShaSource", sha: pipelineLibraryCommitId ],
+                reposSource: [$class: "ManuallyEnteredRepositorySource", url: pipelineLibraryScmGit.getRepoUrl() ],
+                commitShaSource: [$class: "ManuallyEnteredShaSource", sha: pipelineLibraryScmGit.getCommitId() ],
                 contextSource: [$class: 'ManuallyEnteredCommitContextSource', context: env.JOB_NAME ],
                 errorHandlers: [[$class: 'ShallowAnyErrorHandler']],
                 statusResultSource: [
@@ -154,13 +154,13 @@ class Notifier implements Serializable {
             ])
         }
 
-        // COMMIT_ID is null before checkout scm
-        if (currentCommitId != null){
+        // mainScmGit is null before checkout scm
+        if (mainScmGit){
             steps.step([
                 $class: 'GitHubCommitStatusSetter',
                 // Use properties GithubProjectProperty
-                reposSource: [$class: "ManuallyEnteredRepositorySource", url: repoUrl ],
-                commitShaSource: [$class: "ManuallyEnteredShaSource", sha: currentCommitId ],
+                reposSource: [$class: "ManuallyEnteredRepositorySource", url: mainScmGit.getRepoUrl() ],
+                commitShaSource: [$class: "ManuallyEnteredShaSource", sha: mainScmGit.getCommitId() ],
                 contextSource: [$class: 'ManuallyEnteredCommitContextSource', context: ctx],
                 errorHandlers: [[$class: 'ShallowAnyErrorHandler']],
                 statusResultSource: [
@@ -176,15 +176,15 @@ class Notifier implements Serializable {
     // Build success without failed tests
     void successful(String message='') {
         sendHipChat color: "GRAY", notify: true, message: "SUCCESSFUL: Job " + jobLinkHtml()
-            updateGitHubCommitStatus('SUCCESS', message)
-            sendEmail(message)
+        updateGitHubCommitStatus('SUCCESS', message)
+        sendEmail(message)
     }
 
     // Used when tests failure, but compile completed
     void failed(String message='') {
         sendHipChat color: "RED", notify: true, message: "FAILED: Job " + jobLinkHtml()
-            updateGitHubCommitStatus('FAILURE', message)
-            sendEmail(message)
+        updateGitHubCommitStatus('FAILURE', message)
+        sendEmail(message)
     }
 
     // Used when build failure. e.g. build system/script failed, or compile error
@@ -198,18 +198,18 @@ class Notifier implements Serializable {
 
     private void sendEmail(String message='') {
         assert build != null : 'Notifier.build is null'
-            def changes = ""
+        def changes = ""
 
-            // build.changeSets might be null in TestJenkinsfile
-            if (build.changeSets != null ){
-                for(Iterator changeSetIter=build.changeSets.iterator(); changeSetIter.hasNext(); ){
-                    def set=changeSetIter.next();
-                    for(Iterator entryIter=set.iterator(); entryIter.hasNext(); ){
-                        def entry=entryIter.next()
-                        changes += "Commit ${entry.commitId} by ${entry.author.id} (${entry.author.fullName})\n"
-                    }
+        // build.changeSets might be null in TestJenkinsfile
+        if (build.changeSets != null) {
+            for(Iterator changeSetIter=build.changeSets.iterator(); changeSetIter.hasNext(); ){
+                def set=changeSetIter.next()
+                for(Iterator entryIter=set.iterator(); entryIter.hasNext();) {
+                    def entry=entryIter.next()
+                    changes += "Commit ${entry.commitId} by ${entry.author.id} (${entry.author.fullName})\n"
                 }
             }
+        }
         steps.emailext([
             subject: "${env.JOB_NAME} - Build #${build.id} - ${build.result?:'FAILURE'}: ${message}",
             body:  "url: ${build.absoluteUrl}\n" +
