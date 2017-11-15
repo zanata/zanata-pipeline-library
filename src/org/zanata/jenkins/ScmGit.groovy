@@ -65,6 +65,7 @@ class ScmGit implements Serializable {
 
     // Find PR Num
     if (!pullGitLsRemoteLines) {
+      // git ls-remote may return null here
       pullGitLsRemoteLines = steps.sh([
         returnStdout: true,
         script: "git ls-remote $repoUrl refs/pull/*/head",
@@ -95,6 +96,11 @@ class ScmGit implements Serializable {
     for (int i = 0; i < gitLsRemoteLines.length; i++) {
       // split each line by whitespace
       String[] tokens = gitLsRemoteLines[i].split()
+      if (tokens.length < 2) {
+        // It is possible gitLsRemoteLines contains [''],
+        // an array that contains one empty string
+        continue
+      }
       if (tokens[0] == commitId) {
         // format to search is refs/heads/<branch>
         return tokens[1].split('/')[2]
