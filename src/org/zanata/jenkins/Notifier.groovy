@@ -120,7 +120,7 @@ class Notifier implements Serializable {
 
     // We have already obtain the job result
     // If currentBuild.result is null, it will set it as 'SUCCESS'
-    void finish(String message = '') {
+    void finish(def message = '') {
         durationStr = durationToString()
         if (build == null) {
             steps.echo '[WARN] build is null, skipping the finish() method'
@@ -143,10 +143,10 @@ class Notifier implements Serializable {
     // Revised from https://issues.jenkins-ci.org/browse/JENKINS-38674
     // GitHub commit supports following states: 'pending', 'success', 'error' or 'failure'.
     // See: https://developer.github.com/v3/repos/statuses/
-    private void updateGitHubCommitStatus(String state, String message,
+    private void updateGitHubCommitStatus(String state, def message,
                                           String overrideContext = null) {
         def ctx = overrideContext ?: jobContext
-        String outputStr = state + ': ' + message +
+        String outputStr = state + ': ' + message.toString() +
             (durationStr ? " Duration: " + durationStr : '')
 
         if (notifyPipelineLibraryScm) {
@@ -191,7 +191,7 @@ class Notifier implements Serializable {
     }
 
     // Build success without failed tests
-    void successful(String message = '') {
+    void successful(def message = '') {
         sendHipChat color: "GRAY", notify: true,
             message: "SUCCESSFUL: Job " + jobLinkHtml()
         updateGitHubCommitStatus('SUCCESS', message)
@@ -199,7 +199,7 @@ class Notifier implements Serializable {
     }
 
     // Used when tests failure, but compile completed
-    void failed(String message = '') {
+    void failed(def message = '') {
         sendHipChat color: "RED", notify: true,
             message: "FAILED: Job " + jobLinkHtml()
         updateGitHubCommitStatus('FAILURE', message)
@@ -207,7 +207,7 @@ class Notifier implements Serializable {
     }
 
     // Used when build failure. e.g. build system/script failed, or compile error
-    void error(String message = '') {
+    void error(def message = '') {
         // Need durationStr here as notify.finish might not be invoked
         durationStr = durationToString()
         sendHipChat color: "RED", notify: true,
@@ -216,7 +216,7 @@ class Notifier implements Serializable {
         sendEmail(message)
     }
 
-    private void sendEmail(String message = '') {
+    private void sendEmail(def message = '') {
         assert build != null: 'Notifier.build is null'
         def changes = ""
 
