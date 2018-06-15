@@ -2,6 +2,7 @@ package org.zanata.jenkins
 
 import com.cloudbees.groovy.cps.NonCPS
 import groovy.json.JsonSlurper
+@Grab(group='commons-lang', module='commons-lang', version='2.6')
 import static org.apache.commons.lang.StringEscapeUtils.escapeHtml
 
 /**
